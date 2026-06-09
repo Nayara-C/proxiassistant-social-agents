@@ -120,7 +120,9 @@ Workflow interno obrigatório:
 6. Revisão Final verifica riscos: promessas falsas, preços inventados, tom e aprovação humana.
 7. Coordenador devolve tudo consolidado.
 
-Devolve apenas JSON válido, sem markdown, neste formato:
+Devolve apenas JSON válido, sem markdown, sem comentários e sem texto fora do JSON.
+Usa strings simples. Se uma lista for longa, limita a 5 itens.
+Formato:
 {
   "coordinatorMessage": "resumo curto do coordenador",
   "agentsUsed": ["coordinator", "content"],
@@ -188,16 +190,53 @@ function parseAnthropicText(data) {
 }
 
 function safeJsonParse(text) {
+  const normalized = text
+    .replace(/```json/gi, "")
+    .replace(/```/g, "")
+    .replace(/,\s*([}\]])/g, "$1")
+    .trim();
   try {
-    return JSON.parse(text);
+    return JSON.parse(normalized);
   } catch {
-    const start = text.indexOf("{");
-    const end = text.lastIndexOf("}");
+    const start = normalized.indexOf("{");
+    const end = normalized.lastIndexOf("}");
     if (start >= 0 && end > start) {
-      return JSON.parse(text.slice(start, end + 1));
+      const sliced = normalized.slice(start, end + 1).replace(/,\s*([}\]])/g, "$1");
+      return JSON.parse(sliced);
     }
     throw new Error("Resposta da IA não veio em JSON válido.");
   }
+}
+
+async function repairJsonWithModel(rawText, model) {
+  const repairResponse = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": process.env.ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 6500,
+      temperature: 0,
+      system:
+        "Converte a entrada em JSON válido. Não acrescentes conteúdo. Não uses markdown. Corrige apenas sintaxe JSON: vírgulas, aspas, arrays e objetos.",
+      messages: [
+        {
+          role: "user",
+          content: rawText,
+        },
+      ],
+    }),
+  });
+
+  const data = await repairResponse.json();
+  if (!repairResponse.ok) {
+    throw new Error(data.error?.message || "Erro ao reparar JSON da IA.");
+  }
+
+  return safeJsonParse(parseAnthropicText(data));
 }
 
 export default async function handler(req, res) {
@@ -228,7 +267,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model,
-        max_tokens: 5000,
+        max_tokens: 6500,
         temperature: 0.4,
         system: systemPrompt(selectedAgents),
         messages: [
@@ -248,7 +287,12 @@ export default async function handler(req, res) {
     }
 
     const text = parseAnthropicText(data);
-    const parsed = safeJsonParse(text);
+    let parsed;
+    try {
+      parsed = safeJsonParse(text);
+    } catch {
+      parsed = await repairJsonWithModel(text, MODEL_CHEAP);
+    }
 
     return res.status(200).json({
       ...parsed,
