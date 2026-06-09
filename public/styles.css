@@ -581,6 +581,24 @@ select,
     monospace;
 }
 
+.draft-meta {
+  margin-top: 12px;
+  padding: 14px 16px;
+  border-left: 4px solid var(--blue);
+  background: #f8fbfd;
+  color: var(--body);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.draft-meta p {
+  margin: 0 0 8px;
+}
+
+.draft-meta p:last-child {
+  margin-bottom: 0;
+}
+
 .draft-actions {
   display: flex;
   flex-wrap: wrap;

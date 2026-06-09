@@ -321,6 +321,9 @@ function normalizeApiDraft(draft, index) {
     status: draft.status || "Em revisão",
     createdAt: new Date().toISOString(),
     text: draft.text || "",
+    cta: draft.cta || "",
+    hashtags: Array.isArray(draft.hashtags) ? draft.hashtags : [],
+    visualTask: draft.visualTask || null,
     approvals: {
       idea: false,
       caption: false,
@@ -406,10 +409,15 @@ async function runCoordinatorWithApi(requestText, objective, processingId) {
   const response = [
     data.coordinatorMessage || "Pedido recebido e processado pelos agentes reais.",
     "",
+    data.strategy?.objective ? `Objetivo estratégico: ${data.strategy.objective}.` : "",
+    data.strategy?.postingRhythm ? `Ritmo sugerido: ${data.strategy.postingRhythm}.` : "",
+    "",
     `Agentes acionados: ${selectedAgents.map((key) => agents[key]?.name || key).join(", ")}.`,
     data.meta?.model ? `Modelo usado no coordenador: ${data.meta.model}.` : "",
     "",
     `Foram gerados ${drafts.length} rascunho(s), todos pendentes de aprovação humana.`,
+    data.approvalQueue?.length ? `Fila de aprovação: ${data.approvalQueue.length} item(ns).` : "",
+    data.reportingTasks?.length ? `Tarefas de acompanhamento: ${data.reportingTasks.length}.` : "",
   ]
     .filter(Boolean)
     .join("\n");
@@ -427,6 +435,10 @@ async function runCoordinatorWithApi(requestText, objective, processingId) {
     })),
   );
   state.lastAgents = selectedAgents;
+  state.strategy = data.strategy || null;
+  state.workflow = Array.isArray(data.workflow) ? data.workflow : [];
+  state.approvalQueue = Array.isArray(data.approvalQueue) ? data.approvalQueue : [];
+  state.reportingTasks = Array.isArray(data.reportingTasks) ? data.reportingTasks : [];
   (data.provisionalAssumptions || []).forEach(addAssumption);
   state.lastApiRun = {
     at: timestamp,
@@ -596,6 +608,7 @@ function renderDrafts() {
             <span class="status ${statusClass(draft.status)}">${draft.status}</span>
           </header>
           <pre>${escapeHtml(draft.text)}</pre>
+          ${renderDraftMeta(draft)}
           <div class="draft-actions">
             <button class="approve" data-action="approve" data-id="${draft.id}">Aprovar ideia e legenda</button>
             <button data-action="review" data-id="${draft.id}">Manter em revisão</button>
@@ -605,6 +618,23 @@ function renderDrafts() {
       `,
     )
     .join("");
+}
+
+function renderDraftMeta(draft) {
+  const items = [];
+  if (draft.cta) {
+    items.push(`<p><strong>CTA:</strong> ${escapeHtml(draft.cta)}</p>`);
+  }
+  if (draft.hashtags?.length) {
+    items.push(`<p><strong>Hashtags:</strong> ${draft.hashtags.map(escapeHtml).join(" ")}</p>`);
+  }
+  if (draft.visualTask?.needed) {
+    items.push(
+      `<p><strong>Tarefa visual:</strong> ${escapeHtml(draft.visualTask.prompt || "Criar imagem após aprovação humana.")}</p>`,
+    );
+  }
+  if (!items.length) return "";
+  return `<div class="draft-meta">${items.join("")}</div>`;
 }
 
 function renderCalendar() {
