@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="pt">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Proxiassistant | Agentes Instagram</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <section id="auth-view" class="auth-view">
+      <div class="auth-card">
+        <div class="brand auth-brand">
+          <div class="brand-mark">P</div>
+          <div>
+            <h1>Proxiassistant</h1>
+            <p>Social Agent System</p>
+          </div>
+        </div>
+        <h2>Entrar no workspace</h2>
+        <p>
+          Usa o email e password criados no Firebase Authentication para aceder ao
+          sistema de agentes.
+        </p>
+        <form id="login-form" class="login-form">
+          <label>
+            Email
+            <input id="login-email" type="email" autocomplete="email" required />
+          </label>
+          <label>
+            Password
+            <input id="login-password" type="password" autocomplete="current-password" required />
+          </label>
+          <button type="submit">Entrar</button>
+          <div id="login-error" class="login-error" role="alert"></div>
+        </form>
+      </div>
+    </section>
+
+    <div class="app-shell">
+      <header class="site-header">
+        <div class="brand">
+          <div class="brand-mark">P</div>
+          <div>
+            <h1>Proxiassistant</h1>
+            <p>Social Agent System</p>
+          </div>
+        </div>
+
+        <nav class="nav-tabs" aria-label="Secções">
+          <button class="nav-tab active" data-view="workspace" title="Área principal">
+            <span>Início</span>
+            <strong>Operação</strong>
+          </button>
+          <button class="nav-tab" data-view="calendar" title="Calendário">
+            <span>Plano</span>
+            <strong>Calendário</strong>
+          </button>
+          <button class="nav-tab" data-view="approvals" title="Aprovações">
+            <span>Humano</span>
+            <strong>Aprovações</strong>
+          </button>
+          <button class="nav-tab" data-view="memory" title="Memória">
+            <span>Dados</span>
+            <strong>Memória</strong>
+          </button>
+        </nav>
+      </header>
+
+      <main class="main">
+        <header class="topbar hero-panel">
+          <div class="hero-copy">
+            <p class="eyebrow">Workspace local</p>
+            <h2 id="view-title">Operação dos agentes</h2>
+            <p>
+              Coordena conteúdos, legendas e aprovações do Instagram num fluxo simples,
+              com controlo humano antes de qualquer publicação.
+            </p>
+            <div class="safety-row" aria-label="Regras ativas">
+              <span>Publicação manual</span>
+              <span>Respostas em rascunho</span>
+              <span>Sem preços inventados</span>
+              <span>Imagem após aprovação</span>
+            </div>
+          </div>
+          <div class="top-actions">
+            <span id="user-email" class="user-email"></span>
+            <button id="export-json" class="icon-button" title="Exportar dados">⇩</button>
+            <button id="logout-button" class="icon-button" title="Sair">↪</button>
+            <button id="reset-data" class="icon-button danger" title="Limpar dados">×</button>
+          </div>
+        </header>
+
+        <section id="workspace" class="view active-view">
+          <div class="status-grid" aria-label="Estado do sistema">
+            <article class="metric-card">
+              <span>Agentes ativos</span>
+              <strong>4</strong>
+            </article>
+            <article class="metric-card">
+              <span>Publicação</span>
+              <strong>Manual</strong>
+            </article>
+            <article class="metric-card">
+              <span>Imagem</span>
+              <strong>Após aprovação</strong>
+            </article>
+          </div>
+
+          <div class="workspace-grid">
+            <section class="panel coordinator-panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">Briefing</p>
+                  <h3>Agente Coordenador</h3>
+                </div>
+                <span class="status-pill">Local</span>
+              </div>
+
+              <form id="coordinator-form" class="composer">
+                <textarea
+                  id="user-request"
+                  placeholder="Ex: cria 3 posts para empresas locais que precisam de melhorar a organização."
+                  rows="4"
+                ></textarea>
+                <div class="composer-actions">
+                  <select id="objective">
+                    <option value="conteudo">Conteúdo</option>
+                    <option value="campanha">Campanha</option>
+                    <option value="metricas">Métricas</option>
+                    <option value="concorrencia">Concorrência</option>
+                    <option value="resposta">Resposta a cliente</option>
+                  </select>
+                  <button type="submit">Enviar ao Coordenador</button>
+                </div>
+              </form>
+
+              <div class="workflow-strip" aria-label="Fluxo dos agentes">
+                <span>Coordenador</span>
+                <span>Conteúdo</span>
+                <span>Copywriting</span>
+                <span>Aprovação</span>
+              </div>
+
+              <div id="chat-log" class="chat-log" aria-live="polite"></div>
+            </section>
+
+            <section class="panel agents-panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">Encaminhamento</p>
+                  <h3>Agentes acionados</h3>
+                </div>
+              </div>
+              <div id="agent-trace" class="agent-trace"></div>
+            </section>
+          </div>
+
+          <section class="panel outputs-panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Produção</p>
+                <h3>Rascunhos gerados</h3>
+              </div>
+              <button id="copy-last" class="secondary-button">Copiar último</button>
+            </div>
+            <div id="drafts-list" class="drafts-list"></div>
+          </section>
+        </section>
+
+        <section id="calendar" class="view">
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Planeamento</p>
+                <h3>Calendário editorial</h3>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Data</th>
+                    <th>Formato</th>
+                    <th>Categoria</th>
+                    <th>Tema</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="calendar-body"></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+
+        <section id="approvals" class="view">
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Controlo</p>
+                <h3>Aprovação humana</h3>
+              </div>
+            </div>
+            <div id="approval-list" class="approval-list"></div>
+          </section>
+        </section>
+
+        <section id="memory" class="view">
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Transparência</p>
+                <h3>O que é confirmado e o que foi assumido</h3>
+              </div>
+            </div>
+            <div class="memory-grid">
+              <div>
+                <h4>Informação confirmada</h4>
+                <ul id="confirmed-list"></ul>
+              </div>
+              <div>
+                <h4>Hipóteses provisórias</h4>
+                <ul id="assumptions-list"></ul>
+              </div>
+            </div>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>

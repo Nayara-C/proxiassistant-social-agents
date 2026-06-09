@@ -1,0 +1,11 @@
+.DS_Store
+outputs/
+scripts/
+Proxiassistant - Redes Sociais/
+*.docx
+*.pdf
+*.xlsx
+node_modules/
+.env
+.env.local
+.vercel/
