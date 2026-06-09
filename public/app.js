@@ -343,7 +343,14 @@ async function callAgentsApi(requestText, objective) {
     }),
   });
 
-  const data = await response.json();
+  const rawText = await response.text();
+  let data = {};
+  try {
+    data = rawText ? JSON.parse(rawText) : {};
+  } catch {
+    throw new Error(`Resposta inválida da API (${response.status}).`);
+  }
+
   if (!response.ok) {
     throw new Error(data.error || "Erro ao chamar agentes.");
   }
@@ -351,15 +358,38 @@ async function callAgentsApi(requestText, objective) {
 }
 
 async function runCoordinator(requestText, objective) {
+  const processingId = beginCoordinatorRun(requestText);
   try {
-    await runCoordinatorWithApi(requestText, objective);
+    await runCoordinatorWithApi(requestText, objective, processingId);
   } catch (error) {
     console.warn("A usar fallback local:", error);
-    runCoordinatorLocal(requestText, objective, error.message);
+    runCoordinatorLocal(requestText, objective, error.message, processingId);
   }
 }
 
-async function runCoordinatorWithApi(requestText, objective) {
+function beginCoordinatorRun(requestText) {
+  const processingId = `processing-${Date.now()}`;
+  state.messages.push({ sender: "user", name: "Tu", text: requestText });
+  state.messages.push({
+    id: processingId,
+    sender: "agent",
+    name: "Agente Coordenador",
+    text: "A processar o pedido com os agentes...",
+  });
+  render();
+  return processingId;
+}
+
+function finishCoordinatorRun(processingId, text) {
+  const message = state.messages.find((item) => item.id === processingId);
+  if (message) {
+    message.text = text;
+  } else {
+    state.messages.push({ sender: "agent", name: "Agente Coordenador", text });
+  }
+}
+
+async function runCoordinatorWithApi(requestText, objective, processingId) {
   const data = await callAgentsApi(requestText, objective);
   const timestamp = new Date().toISOString();
   const selectedAgents = data.meta?.selectedAgents || data.agentsUsed || ["coordinator"];
@@ -384,8 +414,7 @@ async function runCoordinatorWithApi(requestText, objective) {
     .filter(Boolean)
     .join("\n");
 
-  state.messages.push({ sender: "user", name: "Tu", text: requestText });
-  state.messages.push({ sender: "agent", name: "Agente Coordenador", text: response });
+  finishCoordinatorRun(processingId, response);
   state.drafts.unshift(...drafts);
   state.calendar.unshift(...calendarItems);
   state.approvals.unshift(
@@ -409,7 +438,7 @@ async function runCoordinatorWithApi(requestText, objective) {
   render();
 }
 
-function runCoordinatorLocal(requestText, objective, errorMessage = "") {
+function runCoordinatorLocal(requestText, objective, errorMessage = "", processingId = null) {
   const selectedAgents = inferAgents(requestText, objective);
   const ideas = buildContentIdeas(requestText, objective);
   const timestamp = new Date().toISOString();
@@ -457,8 +486,7 @@ function runCoordinatorLocal(requestText, objective, errorMessage = "") {
     "Nenhum conteúdo foi marcado como aprovado, nenhuma imagem foi autorizada e nada será publicado automaticamente.",
   ].join("\n");
 
-  state.messages.push({ sender: "user", name: "Tu", text: requestText });
-  state.messages.push({ sender: "agent", name: "Agente Coordenador", text: response });
+  finishCoordinatorRun(processingId, response);
   state.drafts.unshift(...drafts);
   state.calendar.unshift(...calendarItems);
   state.approvals.unshift(
