@@ -740,7 +740,7 @@ document.querySelector("#coordinator-form").addEventListener("submit", (event) =
   const input = document.querySelector("#user-request");
   const request = input.value.trim();
   if (!request) return;
-  runCoordinator(request, document.querySelector("#objective").value);
+  runCoordinator(request, "auto");
   input.value = "";
 });
 

@@ -428,6 +428,7 @@ select:focus {
   gap: 12px;
 }
 
+.auto-mode,
 select,
 .composer-actions button,
 .secondary-button {
@@ -438,6 +439,14 @@ select,
   color: var(--body);
   font-size: 14px;
   font-weight: 700;
+}
+
+.auto-mode {
+  display: flex;
+  align-items: center;
+  color: var(--muted);
+  background: #fafafa;
+  font-size: 13px;
 }
 
 .composer-actions button {

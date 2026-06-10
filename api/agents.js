@@ -172,7 +172,7 @@ function contentSystem() {
 
 És o Agente Conteúdo/Calendário.
 Cria calendário editorial profissional com base no pedido e na estratégia do Coordenador.
-Se for pedido mensal e não houver quantidade, cria 12 conteúdos.
+Se for pedido mensal e não houver quantidade, cria 8 conteúdos nesta primeira versão.
 Se for pedido semanal e não houver quantidade, cria 3 conteúdos.
 Alterna formatos: Carrossel, Reels, Post estático, Story.
 Equilibra educativo, autoridade, relacionamento e comercial.
@@ -198,6 +198,7 @@ function copySystem() {
 
 És o Agente Copywriting e Criativo Visual.
 Recebes um calendário e transformas cada item em rascunho pronto para aprovação.
+Mantém cada rascunho compacto para evitar respostas demasiado longas.
 Para carrosséis, escreve estrutura por slides.
 Para Reels, escreve roteiro curto.
 Para posts estáticos, escreve legenda.
@@ -305,6 +306,9 @@ async function runOrchestration({ requestText, objective, selectedAgents, useRev
     system: coordinatorSystem(),
     user: `Objetivo selecionado: ${objective}\nPedido do utilizador: ${requestText}`,
   });
+  if (!coordinator?.strategy) {
+    throw new Error("Agente Coordenador devolveu uma estrutura inválida.");
+  }
 
   const content = await callAnthropicJson({
     model: MODEL_CHEAP,
@@ -312,10 +316,13 @@ async function runOrchestration({ requestText, objective, selectedAgents, useRev
     system: contentSystem(),
     user: JSON.stringify({ requestText, objective, strategy: coordinator.strategy }),
   });
+  if (!Array.isArray(content?.calendar)) {
+    throw new Error("Agente Conteúdo devolveu uma estrutura inválida.");
+  }
 
   const copy = await callAnthropicJson({
     model: MODEL_NORMAL,
-    maxTokens: 7500,
+    maxTokens: 5600,
     system: copySystem(),
     user: JSON.stringify({
       requestText,
@@ -324,6 +331,9 @@ async function runOrchestration({ requestText, objective, selectedAgents, useRev
       calendar: content.calendar || [],
     }),
   });
+  if (!Array.isArray(copy?.drafts)) {
+    throw new Error("Agente Copywriting devolveu uma estrutura inválida.");
+  }
 
   const reviewModel = useReview ? MODEL_REVIEW : MODEL_NORMAL;
   const review = await callAnthropicJson({
@@ -338,6 +348,9 @@ async function runOrchestration({ requestText, objective, selectedAgents, useRev
       drafts: copy.drafts || [],
     }),
   });
+  if (!review?.approvalQueue) {
+    throw new Error("Agente Revisão devolveu uma estrutura inválida.");
+  }
 
   return {
     coordinatorMessage: coordinator.coordinatorMessage,
