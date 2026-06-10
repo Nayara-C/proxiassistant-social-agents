@@ -365,6 +365,154 @@ function buildFallbackFromText(rawText, requestText, selectedAgents, model) {
   };
 }
 
+function asArray(value) {
+  if (Array.isArray(value)) return value;
+  if (!value) return [];
+  if (typeof value === "object") return [value];
+  return [];
+}
+
+function compactText(value, limit = 1800) {
+  return String(value || "")
+    .replace(/\s+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+    .slice(0, limit);
+}
+
+function defaultVisualTask(item) {
+  const title = item?.title || "Conteúdo Proxiassistant";
+  return {
+    needed: true,
+    prompt: `Criar imagem premium para Instagram sobre "${title}", com estética corporate azul/branco/cinza, consultoria profissional, dados ou ambiente empresarial moderno.`,
+    styleNotes:
+      "Visual corporate premium para Proxiassistant/Proxi: azul profundo, branco, cinza claro, fotografia empresarial realista ou abstração elegante, sem copiar marcas existentes.",
+    reviewCriteria: [
+      "parece premium e profissional",
+      "não parece stock genérico",
+      "não inclui preços nem promessas",
+      "mantém coerência com a marca Proxi",
+    ],
+  };
+}
+
+function buildTextFromCalendarItem(item) {
+  const title = item?.title || "Tema Proxiassistant";
+  const format = item?.format || "Post";
+
+  if (/reels/i.test(format)) {
+    return compactText(`Roteiro:
+Cena 1: Apresentar o problema de forma direta.
+Cena 2: Mostrar porque isso afeta a organização e a tomada de decisão.
+Cena 3: Explicar como uma consultoria pode ajudar a criar clareza e prioridades.
+
+Legenda:
+Nem sempre o desafio está na falta de esforço. Muitas vezes, está na falta de processos claros.
+
+Na Proxiassistant, ajudamos empresas e empreendedores a olhar para a gestão com mais estrutura, clareza e foco.
+
+CTA:
+Queres perceber por onde começar? Fala connosco.`);
+  }
+
+  if (/carrossel/i.test(format)) {
+    return compactText(`Slide 1:
+${title}
+
+Slide 2:
+Começa por identificar onde a empresa perde mais tempo, informação ou oportunidades.
+
+Slide 3:
+Depois, organiza responsabilidades, processos e dados essenciais para a gestão.
+
+Slide 4:
+Com mais clareza, a equipa consegue decidir melhor e trabalhar com mais foco.
+
+Slide 5:
+Queres estruturar melhor a tua empresa? Fala com a Proxiassistant.`);
+  }
+
+  return compactText(`Legenda:
+${title}
+
+Uma empresa mais organizada ganha clareza para decidir, acompanhar prioridades e reduzir desperdícios no dia a dia.
+
+A Proxiassistant apoia empresas e empreendedores com uma abordagem profissional, prática e adaptada ao contexto de cada negócio.
+
+CTA:
+Fala connosco para perceber como podemos ajudar.`);
+}
+
+function normalizeDraft(draft, fallbackItem = {}) {
+  const source = draft && typeof draft === "object" ? draft : {};
+  const item = { ...fallbackItem, ...source };
+  const title = item.title || item.topic || fallbackItem.title || "Conteúdo Proxiassistant";
+  const format = item.format || fallbackItem.format || "Post";
+  const category = item.category || fallbackItem.category || "Conteúdo";
+
+  return {
+    title,
+    format,
+    category,
+    text: compactText(item.text || item.caption || item.copy || item.script || buildTextFromCalendarItem(item)),
+    cta: item.cta || "Fala connosco.",
+    hashtags: asArray(item.hashtags).length
+      ? asArray(item.hashtags).map((tag) => String(tag).trim()).filter(Boolean)
+      : ["#proxiassistant", "#consultoria", "#gestao", "#empresas", "#empreendedores"],
+    status: item.status || "Em revisão",
+    visualTask:
+      item.visualTask && typeof item.visualTask === "object"
+        ? {
+            needed: item.visualTask.needed !== false,
+            prompt: item.visualTask.prompt || defaultVisualTask(item).prompt,
+            styleNotes: item.visualTask.styleNotes || defaultVisualTask(item).styleNotes,
+            reviewCriteria: asArray(item.visualTask.reviewCriteria).length
+              ? asArray(item.visualTask.reviewCriteria).map(String)
+              : defaultVisualTask(item).reviewCriteria,
+          }
+        : defaultVisualTask(item),
+    assumptions: asArray(item.assumptions).map(String),
+  };
+}
+
+function normalizeCopyResult(copy, calendar) {
+  const candidates =
+    asArray(copy?.drafts).length
+      ? asArray(copy.drafts)
+      : asArray(copy?.items).length
+        ? asArray(copy.items)
+        : asArray(copy?.content).length
+          ? asArray(copy.content)
+          : asArray(copy?.posts).length
+            ? asArray(copy.posts)
+            : asArray(copy);
+
+  if (candidates.length) {
+    return candidates.map((draft, index) => normalizeDraft(draft, calendar[index] || {}));
+  }
+
+  return asArray(calendar).map((item) => normalizeDraft({}, item));
+}
+
+function normalizeReviewResult(review, drafts) {
+  const approvalQueue = asArray(review?.approvalQueue).length
+    ? asArray(review.approvalQueue)
+    : drafts.map((draft) => ({
+        item: draft.title,
+        requiresApprovalFor: ["ideia", "legenda", "imagem", "publicação"],
+        blockedActions: ["gerar imagem antes da aprovação", "publicar automaticamente"],
+      }));
+
+  return {
+    approvalQueue,
+    reportingTasks: asArray(review?.reportingTasks).map(String),
+    reviewNotes: asArray(review?.reviewNotes).map(String),
+    needsHumanApproval: asArray(review?.needsHumanApproval).length
+      ? asArray(review.needsHumanApproval).map(String)
+      : ["Aprovar ideias, legendas, imagens e publicação final."],
+  };
+}
+
 async function runOrchestration({ requestText, objective, selectedAgents, useReview }) {
   const coordinator = await callAnthropicTool({
     model: MODEL_NORMAL,
@@ -400,33 +548,39 @@ async function runOrchestration({ requestText, objective, selectedAgents, useRev
       calendar: content.calendar || [],
     }),
   });
-  if (!Array.isArray(copy?.drafts)) {
-    throw new Error("Agente Copywriting devolveu uma estrutura inválida.");
+  const drafts = normalizeCopyResult(copy, content.calendar || []);
+  if (!drafts.length) {
+    throw new Error("Não foi possível criar rascunhos a partir do calendário.");
   }
 
   const reviewModel = useReview ? MODEL_REVIEW : MODEL_NORMAL;
-  const review = await callAnthropicTool({
-    model: reviewModel,
-    maxTokens: 3000,
-    temperature: 0.2,
-    system: reviewSystem(),
-    schema: reviewSchema,
-    user: JSON.stringify({
-      requestText,
-      strategy: coordinator.strategy,
-      calendar: content.calendar || [],
-      drafts: copy.drafts || [],
-    }),
-  });
-  if (!review?.approvalQueue) {
-    throw new Error("Agente Revisão devolveu uma estrutura inválida.");
+  let review = {};
+  try {
+    review = await callAnthropicTool({
+      model: reviewModel,
+      maxTokens: 3000,
+      temperature: 0.2,
+      system: reviewSystem(),
+      schema: reviewSchema,
+      user: JSON.stringify({
+        requestText,
+        strategy: coordinator.strategy,
+        calendar: content.calendar || [],
+        drafts,
+      }),
+    });
+  } catch (error) {
+    review = {
+      reviewNotes: [`Revisão automática limitada: ${error.message}`],
+    };
   }
+  const normalizedReview = normalizeReviewResult(review, drafts);
 
   return {
     coordinatorMessage: coordinator.coordinatorMessage,
     agentsUsed: selectedAgents,
     strategy: coordinator.strategy,
-    drafts: copy.drafts || [],
+    drafts,
     calendar: (content.calendar || []).map((item) => ({
       date: item.date || "",
       format: item.format || "Post",
@@ -435,15 +589,15 @@ async function runOrchestration({ requestText, objective, selectedAgents, useRev
       status: item.status || "Em revisão",
     })),
     workflow: coordinator.workflow || [],
-    approvalQueue: review.approvalQueue || [],
-    reportingTasks: review.reportingTasks || [],
+    approvalQueue: normalizedReview.approvalQueue,
+    reportingTasks: normalizedReview.reportingTasks,
     needsHumanApproval: [
       ...(coordinator.needsHumanApproval || []),
-      ...(review.needsHumanApproval || []),
+      ...normalizedReview.needsHumanApproval,
     ],
     confirmedInfo: coordinator.confirmedInfo || [],
     provisionalAssumptions: coordinator.provisionalAssumptions || [],
-    reviewNotes: review.reviewNotes || [],
+    reviewNotes: normalizedReview.reviewNotes,
   };
 }
 
