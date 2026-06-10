@@ -53,34 +53,14 @@ function inferAgents(text, objective) {
   return [...new Set(selected)];
 }
 
-function parseAnthropicText(data) {
-  return (data.content || [])
-    .filter((part) => part.type === "text")
-    .map((part) => part.text)
-    .join("\n")
-    .trim();
-}
-
-function safeJsonParse(text) {
-  const normalized = String(text || "")
-    .replace(/```json/gi, "")
-    .replace(/```/g, "")
-    .replace(/,\s*([}\]])/g, "$1")
-    .trim();
-
-  try {
-    return JSON.parse(normalized);
-  } catch {
-    const start = normalized.indexOf("{");
-    const end = normalized.lastIndexOf("}");
-    if (start >= 0 && end > start) {
-      return JSON.parse(normalized.slice(start, end + 1).replace(/,\s*([}\]])/g, "$1"));
-    }
-    throw new Error("Resposta da IA não veio em JSON válido.");
-  }
-}
-
-async function callAnthropic({ model, system, user, maxTokens = 4500, temperature = 0.35 }) {
+async function callAnthropicTool({
+  model,
+  system,
+  user,
+  schema,
+  maxTokens = 4500,
+  temperature = 0.35,
+}) {
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -93,6 +73,14 @@ async function callAnthropic({ model, system, user, maxTokens = 4500, temperatur
       max_tokens: maxTokens,
       temperature,
       system,
+      tools: [
+        {
+          name: "return_result",
+          description: "Devolve o resultado estruturado para a aplicação.",
+          input_schema: schema,
+        },
+      ],
+      tool_choice: { type: "tool", name: "return_result" },
       messages: [{ role: "user", content: user }],
     }),
   });
@@ -101,24 +89,16 @@ async function callAnthropic({ model, system, user, maxTokens = 4500, temperatur
   if (!response.ok) {
     throw new Error(data.error?.message || "Erro ao chamar Anthropic.");
   }
-  return parseAnthropicText(data);
-}
 
-async function callAnthropicJson(args) {
-  const text = await callAnthropic(args);
-  try {
-    return safeJsonParse(text);
-  } catch {
-    const repaired = await callAnthropic({
-      model: MODEL_CHEAP,
-      maxTokens: args.maxTokens,
-      temperature: 0,
-      system:
-        "Converte a entrada em JSON válido. Não acrescentes conteúdo. Não uses markdown. Corrige apenas sintaxe JSON.",
-      user: text,
-    });
-    return safeJsonParse(repaired);
+  const toolUse = (data.content || []).find(
+    (part) => part.type === "tool_use" && part.name === "return_result",
+  );
+
+  if (!toolUse?.input) {
+    throw new Error("A Anthropic não devolveu resultado estruturado.");
   }
+
+  return toolUse.input;
 }
 
 function baseRules() {
@@ -137,9 +117,148 @@ Regras obrigatórias:
 - Nunca criar provas sociais falsas.
 - Imagens só podem avançar depois de ideia e legenda aprovadas por humano.
 - Publicação automática fica bloqueada.
-- Se algo for hipótese, marcar como "Hipótese provisória".
-- Devolver apenas JSON válido, sem markdown.`;
+- Se algo for hipótese, marcar como "Hipótese provisória".`;
 }
+
+const coordinatorSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    coordinatorMessage: { type: "string" },
+    strategy: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        period: { type: "string" },
+        objective: { type: "string" },
+        contentMix: { type: "array", items: { type: "string" } },
+        postingRhythm: { type: "string" },
+        approvalPolicy: { type: "string" },
+      },
+      required: ["period", "objective", "contentMix", "postingRhythm", "approvalPolicy"],
+    },
+    workflow: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          agent: { type: "string" },
+          task: { type: "string" },
+          status: { type: "string" },
+        },
+        required: ["agent", "task", "status"],
+      },
+    },
+    confirmedInfo: { type: "array", items: { type: "string" } },
+    provisionalAssumptions: { type: "array", items: { type: "string" } },
+    needsHumanApproval: { type: "array", items: { type: "string" } },
+  },
+  required: [
+    "coordinatorMessage",
+    "strategy",
+    "workflow",
+    "confirmedInfo",
+    "provisionalAssumptions",
+    "needsHumanApproval",
+  ],
+};
+
+const contentSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    calendar: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          date: { type: "string" },
+          format: { type: "string" },
+          category: { type: "string" },
+          title: { type: "string" },
+          objective: { type: "string" },
+          status: { type: "string" },
+        },
+        required: ["date", "format", "category", "title", "objective", "status"],
+      },
+    },
+    contentNotes: { type: "array", items: { type: "string" } },
+  },
+  required: ["calendar", "contentNotes"],
+};
+
+const copySchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    drafts: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          title: { type: "string" },
+          format: { type: "string" },
+          category: { type: "string" },
+          text: { type: "string" },
+          cta: { type: "string" },
+          hashtags: { type: "array", items: { type: "string" } },
+          status: { type: "string" },
+          visualTask: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              needed: { type: "boolean" },
+              prompt: { type: "string" },
+              styleNotes: { type: "string" },
+              reviewCriteria: { type: "array", items: { type: "string" } },
+            },
+            required: ["needed", "prompt", "styleNotes", "reviewCriteria"],
+          },
+          assumptions: { type: "array", items: { type: "string" } },
+        },
+        required: [
+          "title",
+          "format",
+          "category",
+          "text",
+          "cta",
+          "hashtags",
+          "status",
+          "visualTask",
+          "assumptions",
+        ],
+      },
+    },
+  },
+  required: ["drafts"],
+};
+
+const reviewSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    approvalQueue: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          item: { type: "string" },
+          requiresApprovalFor: { type: "array", items: { type: "string" } },
+          blockedActions: { type: "array", items: { type: "string" } },
+        },
+        required: ["item", "requiresApprovalFor", "blockedActions"],
+      },
+    },
+    reportingTasks: { type: "array", items: { type: "string" } },
+    reviewNotes: { type: "array", items: { type: "string" } },
+    needsHumanApproval: { type: "array", items: { type: "string" } },
+  },
+  required: ["approvalQueue", "reportingTasks", "reviewNotes", "needsHumanApproval"],
+};
 
 function coordinatorSystem() {
   return `${baseRules()}
@@ -148,23 +267,7 @@ function coordinatorSystem() {
 Quando o utilizador disser algo amplo como "gere o Instagram", cria um plano profissional sem pedir microinstruções.
 Decide período, objetivo, mix editorial, ritmo, workflow e aprovações.
 
-Formato JSON:
-{
-  "coordinatorMessage": "resumo curto",
-  "strategy": {
-    "period": "semana/mês/campanha",
-    "objective": "objetivo principal",
-    "contentMix": ["educativo", "autoridade", "comercial"],
-    "postingRhythm": "ritmo sugerido",
-    "approvalPolicy": "política de aprovação"
-  },
-  "workflow": [
-    {"agent": "coordinator", "task": "tarefa", "status": "feito/pendente"}
-  ],
-  "confirmedInfo": ["informação confirmada"],
-  "provisionalAssumptions": ["hipótese provisória"],
-  "needsHumanApproval": ["ponto a validar"]
-}`;
+Usa a ferramenta return_result para devolver estratégia, workflow, informação confirmada, hipóteses e aprovações necessárias.`;
 }
 
 function contentSystem() {
@@ -177,20 +280,7 @@ Se for pedido semanal e não houver quantidade, cria 3 conteúdos.
 Alterna formatos: Carrossel, Reels, Post estático, Story.
 Equilibra educativo, autoridade, relacionamento e comercial.
 
-Formato JSON:
-{
-  "calendar": [
-    {
-      "date": "YYYY-MM-DD ou Semana 1",
-      "format": "Carrossel/Reels/Post estático/Story",
-      "category": "Educativo/Autoridade/Comercial/Relacionamento",
-      "title": "tema",
-      "objective": "objetivo do conteúdo",
-      "status": "Em revisão"
-    }
-  ],
-  "contentNotes": ["nota curta"]
-}`;
+Usa a ferramenta return_result para devolver calendar e contentNotes.`;
 }
 
 function copySystem() {
@@ -205,27 +295,7 @@ Para posts estáticos, escreve legenda.
 Para Stories, escreve sequência simples.
 Inclui CTA, hashtags e tarefa visual para cada conteúdo.
 
-Formato JSON:
-{
-  "drafts": [
-    {
-      "title": "título",
-      "format": "Carrossel/Reels/Post estático/Story/Resposta",
-      "category": "categoria",
-      "text": "conteúdo completo em rascunho",
-      "cta": "CTA sugerido",
-      "hashtags": ["#hashtag"],
-      "status": "Em revisão",
-      "visualTask": {
-        "needed": true,
-        "prompt": "prompt visual futuro",
-        "styleNotes": "direção visual profissional",
-        "reviewCriteria": ["legibilidade", "profissionalismo", "coerência"]
-      },
-      "assumptions": ["hipótese usada"]
-    }
-  ]
-}`;
+Usa a ferramenta return_result para devolver drafts estruturados.`;
 }
 
 function reviewSystem() {
@@ -235,19 +305,7 @@ function reviewSystem() {
 Revê riscos, aprovações, promessas, preço inventado, tom e organização.
 Não reescrevas tudo. Devolve fila de aprovação, tarefas de relatório e alertas.
 
-Formato JSON:
-{
-  "approvalQueue": [
-    {
-      "item": "nome do conteúdo",
-      "requiresApprovalFor": ["ideia", "legenda", "imagem", "publicação"],
-      "blockedActions": ["publicar", "responder cliente"]
-    }
-  ],
-  "reportingTasks": ["tarefa"],
-  "reviewNotes": ["nota"],
-  "needsHumanApproval": ["ponto a validar"]
-}`;
+Usa a ferramenta return_result para devolver approvalQueue, reportingTasks, reviewNotes e needsHumanApproval.`;
 }
 
 function buildFallbackFromText(rawText, requestText, selectedAgents, model) {
@@ -300,30 +358,33 @@ function buildFallbackFromText(rawText, requestText, selectedAgents, model) {
 }
 
 async function runOrchestration({ requestText, objective, selectedAgents, useReview }) {
-  const coordinator = await callAnthropicJson({
+  const coordinator = await callAnthropicTool({
     model: MODEL_NORMAL,
     maxTokens: 2200,
     system: coordinatorSystem(),
+    schema: coordinatorSchema,
     user: `Objetivo selecionado: ${objective}\nPedido do utilizador: ${requestText}`,
   });
   if (!coordinator?.strategy) {
     throw new Error("Agente Coordenador devolveu uma estrutura inválida.");
   }
 
-  const content = await callAnthropicJson({
+  const content = await callAnthropicTool({
     model: MODEL_CHEAP,
     maxTokens: 4200,
     system: contentSystem(),
+    schema: contentSchema,
     user: JSON.stringify({ requestText, objective, strategy: coordinator.strategy }),
   });
   if (!Array.isArray(content?.calendar)) {
     throw new Error("Agente Conteúdo devolveu uma estrutura inválida.");
   }
 
-  const copy = await callAnthropicJson({
+  const copy = await callAnthropicTool({
     model: MODEL_NORMAL,
     maxTokens: 5600,
     system: copySystem(),
+    schema: copySchema,
     user: JSON.stringify({
       requestText,
       objective,
@@ -336,11 +397,12 @@ async function runOrchestration({ requestText, objective, selectedAgents, useRev
   }
 
   const reviewModel = useReview ? MODEL_REVIEW : MODEL_NORMAL;
-  const review = await callAnthropicJson({
+  const review = await callAnthropicTool({
     model: reviewModel,
     maxTokens: 3000,
     temperature: 0.2,
     system: reviewSystem(),
+    schema: reviewSchema,
     user: JSON.stringify({
       requestText,
       strategy: coordinator.strategy,
