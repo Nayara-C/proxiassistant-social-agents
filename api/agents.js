@@ -239,6 +239,69 @@ async function repairJsonWithModel(rawText, model) {
   return safeJsonParse(parseAnthropicText(data));
 }
 
+function buildFallbackFromText(rawText, requestText, selectedAgents, model) {
+  const cleanText = rawText
+    .replace(/```json/gi, "")
+    .replace(/```/g, "")
+    .trim();
+
+  return {
+    coordinatorMessage:
+      "A IA gerou conteúdo, mas a estrutura técnica veio inválida. Transformei a resposta num rascunho seguro para revisão humana.",
+    agentsUsed: selectedAgents,
+    strategy: {
+      period: "a confirmar",
+      objective: requestText,
+      contentMix: ["educativo", "autoridade", "comercial"],
+      postingRhythm: "a confirmar pela equipa",
+      approvalPolicy:
+        "Ideias, legendas, imagens, respostas e publicação ficam pendentes de aprovação humana.",
+    },
+    drafts: [
+      {
+        title: "Rascunho gerado pelo Coordenador",
+        format: "Plano/Rascunho",
+        category: "Gestão de redes sociais",
+        text: cleanText || "A resposta da IA veio vazia ou ilegível.",
+        cta: "",
+        hashtags: [],
+        status: "Em revisão",
+        visualTask: {
+          needed: true,
+          prompt: "Criar direção visual apenas depois de aprovação humana da ideia e legenda.",
+          styleNotes: "Visual profissional, limpo, alinhado com consultoria local.",
+          reviewCriteria: ["legibilidade", "profissionalismo", "coerência com a marca"],
+        },
+        assumptions: ["Fallback técnico usado porque a resposta JSON veio inválida."],
+      },
+    ],
+    calendar: [],
+    workflow: [
+      {
+        agent: "coordinator",
+        task: "Converter resposta inválida em rascunho seguro.",
+        status: "feito",
+      },
+    ],
+    approvalQueue: [
+      {
+        item: "Rascunho gerado pelo Coordenador",
+        requiresApprovalFor: ["ideia", "legenda", "imagem", "publicação"],
+        blockedActions: ["publicar", "responder cliente"],
+      },
+    ],
+    reportingTasks: ["Rever o rascunho e pedir nova geração se a estrutura estiver incompleta."],
+    needsHumanApproval: ["Validar conteúdo antes de qualquer uso."],
+    confirmedInfo: ["A Proxiassistant exige aprovação humana antes de publicar."],
+    provisionalAssumptions: ["A resposta foi preservada como rascunho por segurança."],
+    meta: {
+      model,
+      selectedAgents,
+      parserFallback: true,
+    },
+  };
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
@@ -291,12 +354,17 @@ export default async function handler(req, res) {
     try {
       parsed = safeJsonParse(text);
     } catch {
-      parsed = await repairJsonWithModel(text, MODEL_CHEAP);
+      try {
+        parsed = await repairJsonWithModel(text, MODEL_CHEAP);
+      } catch {
+        parsed = buildFallbackFromText(text, requestText, selectedAgents, model);
+      }
     }
 
     return res.status(200).json({
       ...parsed,
       meta: {
+        ...(parsed.meta || {}),
         model,
         selectedAgents,
         cheapModel: MODEL_CHEAP,
