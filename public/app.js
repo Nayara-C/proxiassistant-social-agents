@@ -355,9 +355,24 @@ async function callAgentsApi(requestText, objective) {
   }
 
   if (!response.ok) {
-    throw new Error(data.error || "Erro ao chamar agentes.");
+    throw new Error(readableApiError(data.error || data || "Erro ao chamar agentes."));
   }
   return data;
+}
+
+function readableApiError(error) {
+  if (!error) return "Erro desconhecido.";
+  if (typeof error === "string") return error;
+  if (typeof error.message === "string") return error.message;
+  if (typeof error.error === "string") return error.error;
+  if (typeof error.type === "string") {
+    return `${error.type}: ${JSON.stringify(error)}`;
+  }
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
 }
 
 async function runCoordinator(requestText, objective) {
