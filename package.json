@@ -5,6 +5,6 @@
   "type": "module",
   "scripts": {
     "start": "python3 -m http.server 8000 -d public",
-    "check": "node --check api/agents.js && node --check public/app.js"
+    "check": "node --check api/agents.js && node --check api/images.js && node --check public/app.js"
   }
 }

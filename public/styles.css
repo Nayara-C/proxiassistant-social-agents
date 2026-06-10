@@ -635,6 +635,36 @@ select,
   border-color: #e1b7b7;
 }
 
+.draft-actions .image {
+  color: var(--blue);
+  border-color: #b8cde3;
+  background: #f8fbfd;
+}
+
+.image-result {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid #d9e4ee;
+  background: #f8fbfd;
+  color: var(--body);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.image-result img {
+  width: min(100%, 360px);
+  aspect-ratio: 1;
+  object-fit: cover;
+  border: 1px solid #d8d8d8;
+  background: #ffffff;
+}
+
+.image-result p {
+  margin: 0;
+}
+
 .status {
   display: inline-flex;
   align-items: center;

@@ -324,6 +324,8 @@ function normalizeApiDraft(draft, index) {
     cta: draft.cta || "",
     hashtags: Array.isArray(draft.hashtags) ? draft.hashtags : [],
     visualTask: draft.visualTask || null,
+    image: draft.image || null,
+    imageStatus: draft.imageStatus || "Não gerada",
     approvals: {
       idea: false,
       caption: false,
@@ -489,6 +491,14 @@ function runCoordinatorLocal(requestText, objective, errorMessage = "", processi
       "CTA provisório usado até validação humana.",
       "Datas são piloto e podem ser alteradas.",
     ],
+    visualTask: {
+      needed: true,
+      prompt: `Criar imagem profissional para "${idea.title}", com estilo limpo de consultoria empresarial.`,
+      styleNotes: "Visual profissional, claro e alinhado com empresas e empreendedores.",
+      reviewCriteria: ["legibilidade", "profissionalismo", "coerência com a legenda"],
+    },
+    image: null,
+    imageStatus: "Não gerada",
   }));
 
   const calendarItems = ideas
@@ -534,6 +544,57 @@ function runCoordinatorLocal(requestText, objective, errorMessage = "", processi
       addAssumption("Concorrentes ainda não foram indicados; análise será provisória até haver nomes ou links.");
     }
   });
+
+  saveState();
+  render();
+}
+
+async function generateImageForDraft(id) {
+  const draft = state.drafts.find((item) => item.id === id);
+  if (!draft || draft.status !== "Aprovado") return;
+
+  draft.imageStatus = "A gerar imagem...";
+  saveState();
+  render();
+
+  try {
+    const response = await fetch("/api/images", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        title: draft.title,
+        format: draft.format,
+        category: draft.category,
+        caption: draft.text,
+        visualTask: draft.visualTask,
+      }),
+    });
+
+    const rawText = await response.text();
+    const data = rawText ? JSON.parse(rawText) : {};
+    if (!response.ok) {
+      throw new Error(readableApiError(data.error || data || "Erro ao gerar imagem."));
+    }
+
+    draft.image = {
+      url: data.imageUrl,
+      revisedPrompt: data.revisedPrompt,
+      review: data.review,
+      provider: data.meta?.provider || "openai",
+      model: data.meta?.model || "",
+      createdAt: new Date().toISOString(),
+    };
+    draft.imageStatus = data.review?.status || "Pronto para revisão humana";
+    draft.approvals.image = false;
+
+    const approval = state.approvals.find((item) => item.id === id);
+    if (approval) {
+      approval.imageAllowed = false;
+      approval.imageStatus = draft.imageStatus;
+    }
+  } catch (error) {
+    draft.imageStatus = `Erro ao gerar imagem: ${error.message}`;
+  }
 
   saveState();
   render();
@@ -624,8 +685,14 @@ function renderDrafts() {
           </header>
           <pre>${escapeHtml(draft.text)}</pre>
           ${renderDraftMeta(draft)}
+          ${renderDraftImage(draft)}
           <div class="draft-actions">
             <button class="approve" data-action="approve" data-id="${draft.id}">Aprovar ideia e legenda</button>
+            ${
+              draft.status === "Aprovado"
+                ? `<button class="image" data-action="image" data-id="${draft.id}">Gerar imagem</button>`
+                : ""
+            }
             <button data-action="review" data-id="${draft.id}">Manter em revisão</button>
             <button class="reject" data-action="reject" data-id="${draft.id}">Rejeitar</button>
           </div>
@@ -650,6 +717,34 @@ function renderDraftMeta(draft) {
   }
   if (!items.length) return "";
   return `<div class="draft-meta">${items.join("")}</div>`;
+}
+
+function renderDraftImage(draft) {
+  if (!draft.image && (!draft.imageStatus || draft.imageStatus === "Não gerada")) return "";
+
+  const warnings = draft.image?.review?.warnings || [];
+  const warningHtml = warnings.length
+    ? `<p><strong>Alertas:</strong> ${warnings.map(escapeHtml).join(" ")}</p>`
+    : "";
+
+  return `
+    <div class="image-result">
+      <div>
+        <strong>Imagem:</strong> ${escapeHtml(draft.imageStatus || "Não gerada")}
+      </div>
+      ${
+        draft.image?.url
+          ? `<img src="${draft.image.url}" alt="Imagem gerada para ${escapeHtml(draft.title)}" loading="lazy" />`
+          : ""
+      }
+      ${warningHtml}
+      ${
+        draft.image?.model
+          ? `<p class="eyebrow">Gerada por ${escapeHtml(draft.image.provider)} · ${escapeHtml(draft.image.model)} · ainda requer aprovação humana</p>`
+          : ""
+      }
+    </div>
+  `;
 }
 
 function renderCalendar() {
@@ -758,6 +853,7 @@ document.querySelector("#drafts-list").addEventListener("click", (event) => {
   const button = event.target.closest("button[data-action]");
   if (!button) return;
   if (button.dataset.action === "approve") setDraftStatus(button.dataset.id, "Aprovado");
+  if (button.dataset.action === "image") generateImageForDraft(button.dataset.id);
   if (button.dataset.action === "review") setDraftStatus(button.dataset.id, "Em revisão");
   if (button.dataset.action === "reject") setDraftStatus(button.dataset.id, "Rejeitado");
 });
