@@ -52,9 +52,17 @@ const agents = {
     name: "Agente Copywriting",
     role: "Escreve legendas, CTAs, hashtags, roteiros e respostas em rascunho.",
   },
+  visual: {
+    name: "Agente Criativo Visual/Imagem",
+    role: "Define direção visual premium e cria imagens após aprovação humana.",
+  },
   reports: {
     name: "Agente Relatórios Excel",
     role: "Organiza dados em tabelas, status e próximos passos.",
+  },
+  review: {
+    name: "Agente Revisão Final",
+    role: "Revê riscos, tom, promessas e decisões importantes.",
   },
   metrics: {
     name: "Agente Métricas",
@@ -151,6 +159,9 @@ function inferAgents(text, objective) {
   }
   if (/legenda|copy|hashtags|reels|comentario|mensagem|dm|resposta|texto/.test(clean)) {
     selected.push("copy");
+  }
+  if (/conteudo|post|posts|calendario|ideia|semana|mes|campanha|imagem|visual|design/.test(clean)) {
+    selected.push("visual");
   }
   if (/excel|relatorio|tabela|organizar|aprovacao|status/.test(clean)) {
     selected.push("reports");
@@ -552,6 +563,11 @@ function runCoordinatorLocal(requestText, objective, errorMessage = "", processi
 async function generateImageForDraft(id) {
   const draft = state.drafts.find((item) => item.id === id);
   if (!draft || draft.status !== "Aprovado") return;
+  if (draft.imageStatus === "A gerar imagem...") return;
+  if (draft.image?.url) {
+    const ok = confirm("Este rascunho já tem uma imagem. Queres gastar créditos para gerar outra?");
+    if (!ok) return;
+  }
 
   draft.imageStatus = "A gerar imagem...";
   saveState();
@@ -690,7 +706,9 @@ function renderDrafts() {
             <button class="approve" data-action="approve" data-id="${draft.id}">Aprovar ideia e legenda</button>
             ${
               draft.status === "Aprovado"
-                ? `<button class="image" data-action="image" data-id="${draft.id}">Gerar imagem</button>`
+                ? `<button class="image" data-action="image" data-id="${draft.id}" ${
+                    draft.imageStatus === "A gerar imagem..." ? "disabled" : ""
+                  }>${draft.image?.url ? "Gerar nova imagem" : "Gerar imagem"}</button>`
                 : ""
             }
             <button data-action="review" data-id="${draft.id}">Manter em revisão</button>

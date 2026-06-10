@@ -1,21 +1,40 @@
 const IDEOGRAM_MODEL_ENDPOINT =
   process.env.IDEOGRAM_MODEL_ENDPOINT || "https://api.ideogram.ai/v1/ideogram-v3/generate";
 const IDEOGRAM_RENDERING_SPEED = process.env.IDEOGRAM_RENDERING_SPEED || "TURBO";
+const MAX_PROMPT_LENGTH = 3600;
+
+function compactText(value, limit = 1400) {
+  return String(value || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, limit);
+}
 
 function buildImagePrompt({ title, format, category, caption, visualTask }) {
   const styleNotes =
     visualTask?.styleNotes ||
-    "Design profissional, claro e sóbrio para consultoria local, inspirado em comunicação empresarial.";
+    "Design profissional, claro e sóbrio para consultoria local, inspirado em comunicação empresarial premium.";
 
-  return [
-    "Cria uma imagem para um post de Instagram da Proxiassistant.",
+  const prompt = [
+    "Criar uma imagem quadrada premium para Instagram da marca Proxiassistant / Proxi.",
     "",
-    "Identidade visual:",
-    "- Empresa de consultoria local para empresas e empreendedores.",
-    "- Estilo profissional, limpo, moderno e credível.",
-    "- Usar azul corporativo, branco, cinza claro e pequenos detalhes neutros.",
-    "- Evitar aspeto genérico de IA, excesso de brilho, elementos fantasiosos ou texto ilegível.",
-    "- Não incluir preços, promessas de resultados, selos falsos, avaliações falsas ou logótipos de terceiros.",
+    "Direção de marca:",
+    "- Consultoria local para empresas e empreendedores.",
+    "- Aparência de consultoria profissional premium, ao nível de firmas reconhecidas, sem copiar Deloitte, PwC, KPMG ou qualquer marca existente.",
+    "- Sensação: confiança, rigor, clareza, organização, inovação discreta.",
+    "- Visual limpo, editorial, sofisticado, corporativo e credível.",
+    "- Usar azul corporativo profundo semelhante ao logótipo Proxi, branco, cinza claro, azul claro e detalhes subtis.",
+    "- Composição com muito espaço negativo, hierarquia clara e ar premium.",
+    "- Fotografia empresarial realista ou abstrato corporativo elegante, conforme o tema.",
+    "- Evitar stock genérico exagerado, pessoas com aparência artificial, mãos deformadas, gráficos confusos, excesso de brilhos, 3D infantil ou estilo cartoon.",
+    "- Se houver texto na imagem, usar apenas poucas palavras grandes, limpas e legíveis; preferir áreas sem texto quando houver dúvida.",
+    "- Não usar logótipos de terceiros.",
+    "- Não incluir preços, promessas de resultados, selos falsos, rankings falsos ou avaliações falsas.",
+    "",
+    "Elementos visuais aceitáveis:",
+    "- Escritório moderno com vidro, reuniões profissionais, análise de dados, relatórios financeiros, gráficos subtis, cidade corporativa, arquitetura moderna.",
+    "- Abstrações com linhas finas, pontos conectados, mapas discretos, grelhas, dashboards e formas geométricas sóbrias.",
+    "- Estética consistente com portfólio corporate azul e branco.",
     "",
     `Formato do conteúdo: ${format || "Post Instagram"}.`,
     `Categoria: ${category || "Conteúdo empresarial"}.`,
@@ -28,15 +47,17 @@ function buildImagePrompt({ title, format, category, caption, visualTask }) {
     styleNotes,
     "",
     "Resumo da legenda para contexto:",
-    String(caption || "").slice(0, 1400),
+    compactText(caption),
   ].join("\n");
+
+  return prompt.slice(0, MAX_PROMPT_LENGTH);
 }
 
 function reviewVisualRequest({ title, caption, visualTask }) {
   const warnings = [];
   const joined = `${title || ""} ${caption || ""} ${visualTask?.prompt || ""}`.toLowerCase();
 
-  if (/(preço|kwanza|usd|€|\\$)/i.test(joined)) {
+  if (/(preço|kwanza|usd|€|\$)/i.test(joined)) {
     warnings.push("O pedido menciona preço; confirmar manualmente antes de usar.");
   }
   if (/(garantid|resultado garantido|100%|milagre|fórmula mágica)/i.test(joined)) {
@@ -45,12 +66,17 @@ function reviewVisualRequest({ title, caption, visualTask }) {
   if (!visualTask?.prompt) {
     warnings.push("O rascunho não tinha prompt visual detalhado; foi usado um prompt seguro padrão.");
   }
+  if (String(visualTask?.prompt || "").length < 80) {
+    warnings.push("O prompt visual era curto; foi enriquecido automaticamente com o guia visual Proxi.");
+  }
 
   return {
     status: warnings.length ? "Precisa revisão humana" : "Pronto para revisão humana",
     warnings,
     criteria: [
-      "A imagem deve parecer profissional e adequada a consultoria.",
+      "A imagem deve parecer premium, profissional e adequada a consultoria.",
+      "A imagem deve seguir o universo azul/branco/cinza da Proxi.",
+      "A imagem não deve parecer stock genérico nem visual artificial.",
       "Não deve conter preços, promessas garantidas ou provas sociais falsas.",
       "A imagem final deve ser validada por uma pessoa antes de publicar.",
     ],
@@ -89,10 +115,16 @@ export default async function handler(request, response) {
       }),
     });
 
-    const data = await ideogramResponse.json();
+    const rawData = await ideogramResponse.text();
+    let data = {};
+    try {
+      data = rawData ? JSON.parse(rawData) : {};
+    } catch {
+      data = { message: rawData || "Resposta inválida da Ideogram." };
+    }
     if (!ideogramResponse.ok) {
       response.status(ideogramResponse.status).json({
-        error: data.error?.message || "Erro ao gerar imagem.",
+        error: data.error?.message || data.message || "Erro ao gerar imagem.",
       });
       return;
     }
@@ -111,6 +143,11 @@ export default async function handler(request, response) {
         provider: "ideogram",
         model: `ideogram-v3-${IDEOGRAM_RENDERING_SPEED.toLowerCase()}`,
         approvalRequired: true,
+        costControl: {
+          imagesRequested: 1,
+          duplicateRequestsBlockedInApp: true,
+          renderingSpeed: IDEOGRAM_RENDERING_SPEED,
+        },
       },
     });
   } catch (error) {

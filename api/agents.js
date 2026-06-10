@@ -44,9 +44,8 @@ function normalize(text) {
 
 function inferAgents(text, objective) {
   const clean = normalize(`${objective} ${text}`);
-  const selected = ["coordinator", "content", "copy", "reports"];
+  const selected = ["coordinator", "content", "copy", "visual", "reports"];
 
-  if (/imagem|visual|design|criativo|post visual/.test(clean)) selected.push("visual");
   if (/rever|revisao|final|estrategia|decisao importante/.test(clean)) selected.push("review");
   if (/comentario|mensagem|dm|cliente|responder|comunidade/.test(clean)) selected.push("copy");
 
@@ -294,6 +293,15 @@ Para Reels, escreve roteiro curto.
 Para posts estáticos, escreve legenda.
 Para Stories, escreve sequência simples.
 Inclui CTA, hashtags e tarefa visual para cada conteúdo.
+
+Guia visual obrigatório para visualTask:
+- Portfólio corporate premium para Proxiassistant / Proxi.
+- Inspirar-se em padrões de consultoria profissional de alto nível sem copiar Deloitte, PwC, KPMG ou qualquer marca existente.
+- Estilo limpo, editorial, moderno, confiável e sofisticado.
+- Paleta: azul corporativo profundo, branco, cinza claro, azul claro e pequenos detalhes neutros.
+- Misturar fotografia empresarial realista, arquitetura moderna, dados/relatórios, mapas discretos, gráficos subtis e abstrações com linhas finas.
+- Evitar aparência genérica de IA, stock artificial, excesso de texto, promessas, preços e logótipos de terceiros.
+- Criar prompts específicos por post, com critérios de revisão úteis.
 
 Usa a ferramenta return_result para devolver drafts estruturados.`;
 }
