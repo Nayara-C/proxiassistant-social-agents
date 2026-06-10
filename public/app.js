@@ -580,7 +580,7 @@ async function generateImageForDraft(id) {
       url: data.imageUrl,
       revisedPrompt: data.revisedPrompt,
       review: data.review,
-      provider: data.meta?.provider || "openai",
+      provider: data.meta?.provider || "ideogram",
       model: data.meta?.model || "",
       createdAt: new Date().toISOString(),
     };

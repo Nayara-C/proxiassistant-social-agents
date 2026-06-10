@@ -1,4 +1,6 @@
-const IMAGE_MODEL = process.env.IMAGE_MODEL || "gpt-image-1";
+const IDEOGRAM_MODEL_ENDPOINT =
+  process.env.IDEOGRAM_MODEL_ENDPOINT || "https://api.ideogram.ai/v1/ideogram-v3/generate";
+const IDEOGRAM_RENDERING_SPEED = process.env.IDEOGRAM_RENDERING_SPEED || "TURBO";
 
 function buildImagePrompt({ title, format, category, caption, visualTask }) {
   const styleNotes =
@@ -61,10 +63,10 @@ export default async function handler(request, response) {
     return;
   }
 
-  if (!process.env.OPENAI_API_KEY) {
+  if (!process.env.IDEOGRAM_API_KEY) {
     response.status(500).json({
       error:
-        "OPENAI_API_KEY não está configurada na Vercel. Adiciona essa variável para ativar a geração de imagens.",
+        "IDEOGRAM_API_KEY não está configurada na Vercel. Adiciona essa variável para ativar a geração de imagens.",
     });
     return;
   }
@@ -74,42 +76,40 @@ export default async function handler(request, response) {
     const review = reviewVisualRequest(payload);
     const prompt = buildImagePrompt(payload);
 
-    const openaiResponse = await fetch("https://api.openai.com/v1/images/generations", {
+    const ideogramResponse = await fetch(IDEOGRAM_MODEL_ENDPOINT, {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        "Api-Key": process.env.IDEOGRAM_API_KEY,
       },
       body: JSON.stringify({
-        model: IMAGE_MODEL,
         prompt,
-        size: "1024x1024",
-        quality: "low",
-        output_format: "png",
+        rendering_speed: IDEOGRAM_RENDERING_SPEED,
+        aspect_ratio: "ASPECT_1_1",
       }),
     });
 
-    const data = await openaiResponse.json();
-    if (!openaiResponse.ok) {
-      response.status(openaiResponse.status).json({
+    const data = await ideogramResponse.json();
+    if (!ideogramResponse.ok) {
+      response.status(ideogramResponse.status).json({
         error: data.error?.message || "Erro ao gerar imagem.",
       });
       return;
     }
 
     const image = data.data?.[0];
-    if (!image?.b64_json && !image?.url) {
+    if (!image?.url) {
       response.status(500).json({ error: "A API de imagem não devolveu uma imagem utilizável." });
       return;
     }
 
     response.status(200).json({
-      imageUrl: image.b64_json ? `data:image/png;base64,${image.b64_json}` : image.url,
-      revisedPrompt: image.revised_prompt || prompt,
+      imageUrl: image.url,
+      revisedPrompt: image.revised_prompt || image.prompt || prompt,
       review,
       meta: {
-        provider: "openai",
-        model: IMAGE_MODEL,
+        provider: "ideogram",
+        model: `ideogram-v3-${IDEOGRAM_RENDERING_SPEED.toLowerCase()}`,
         approvalRequired: true,
       },
     });
