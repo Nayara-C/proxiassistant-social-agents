@@ -6,179 +6,51 @@ const AGENT_REGISTRY = {
   coordinator: {
     name: "Agente Coordenador",
     model: MODEL_NORMAL,
-    useWhen: "Sempre. Interpreta o pedido e consolida o trabalho dos outros agentes.",
+    useWhen: "Orquestra o fluxo, decide etapas, consolida e protege as regras.",
   },
   content: {
     name: "Agente Conteúdo/Calendário",
     model: MODEL_CHEAP,
-    useWhen: "Ideias, calendário, categorias, temas, formatos e campanhas.",
+    useWhen: "Estratégia editorial, calendário, formatos e categorias.",
   },
   copy: {
     name: "Agente Copywriting",
     model: MODEL_NORMAL,
-    useWhen: "Legendas, CTAs, hashtags, roteiros de reels e respostas em rascunho.",
-  },
-  reports: {
-    name: "Agente Relatórios Excel",
-    model: MODEL_CHEAP,
-    useWhen: "Tabelas, organização, status, aprovações, relatórios e métricas.",
-  },
-  review: {
-    name: "Agente Revisão Final",
-    model: MODEL_REVIEW,
-    useWhen: "Revisão estratégica ou decisões importantes. Usar pouco por custo.",
+    useWhen: "Legendas, CTAs, hashtags, roteiros e respostas em rascunho.",
   },
   visual: {
     name: "Agente Criativo Visual",
     model: MODEL_NORMAL,
-    useWhen: "Direção visual, prompts de imagem e critérios para revisão visual.",
+    useWhen: "Prompts visuais, direção de imagem e critérios de revisão.",
   },
-  community: {
-    name: "Agente Comunidade/Atendimento",
-    model: MODEL_NORMAL,
-    useWhen: "Comentários, mensagens, triagem de clientes e respostas em rascunho.",
+  reports: {
+    name: "Agente Relatórios Excel",
+    model: MODEL_CHEAP,
+    useWhen: "Status, aprovações, relatório, métricas e organização.",
+  },
+  review: {
+    name: "Agente Revisão Final",
+    model: MODEL_REVIEW,
+    useWhen: "Revisão de riscos, promessas, tom e decisões importantes.",
   },
 };
 
-function inferAgents(text, objective) {
-  const clean = `${objective} ${text}`
+function normalize(text) {
+  return String(text || "")
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
-  const selected = ["coordinator"];
-
-  if (/conteudo|post|posts|calendario|ideia|semana|mes|campanha|gere|gerir|gestao/.test(clean)) selected.push("content");
-  if (/legenda|copy|hashtags|reels|comentario|mensagem|dm|resposta|texto/.test(clean)) selected.push("copy");
-  if (/excel|relatorio|tabela|organizar|aprovacao|status|metrica/.test(clean)) selected.push("reports");
-  if (/imagem|visual|design|criativo|post visual/.test(clean)) selected.push("visual");
-  if (/comentario|mensagem|dm|cliente|responder|comunidade/.test(clean)) selected.push("community");
-  if (/rever|revisao|final|estrategia|decisao importante/.test(clean)) selected.push("review");
-  if (selected.length === 1) selected.push("content", "copy", "reports");
-
-  return [...new Set(selected)];
 }
 
-function systemPrompt(selectedAgents) {
-  const agentList = selectedAgents
-    .map((key) => {
-      const agent = AGENT_REGISTRY[key];
-      return `- ${key}: ${agent.name}. Modelo previsto: ${agent.model}. Uso: ${agent.useWhen}`;
-    })
-    .join("\n");
+function inferAgents(text, objective) {
+  const clean = normalize(`${objective} ${text}`);
+  const selected = ["coordinator", "content", "copy", "reports"];
 
-  return `És o Agente Coordenador principal do sistema de gestão de redes sociais da Proxiassistant.
+  if (/imagem|visual|design|criativo|post visual/.test(clean)) selected.push("visual");
+  if (/rever|revisao|final|estrategia|decisao importante/.test(clean)) selected.push("review");
+  if (/comentario|mensagem|dm|cliente|responder|comunidade/.test(clean)) selected.push("copy");
 
-A tua função não é apenas responder ao pedido. A tua função é agir como gestor completo de redes sociais:
-- interpretar pedidos amplos como "gere o Instagram este mês";
-- criar um plano profissional mesmo quando o utilizador dá pouca instrução;
-- decidir que agentes especialistas devem trabalhar;
-- consolidar resultados;
-- criar próximos passos claros;
-- manter tudo pendente de aprovação humana.
-
-Contexto da marca:
-- A Proxiassistant é uma empresa de consultoria local para empresas e empreendedores.
-- O Instagram é o canal principal.
-- A consultoria pode abranger várias áreas, não apenas uma área específica.
-- O tom de voz é profissional, claro e direto.
-- A linha editorial deve misturar conteúdo educativo, autoridade, relacionamento e comercial.
-
-Comportamento esperado:
-- Se o pedido for amplo, cria um plano mensal completo.
-- Se o pedido for semanal, cria um plano semanal.
-- Se o pedido não disser quantidade, assume um plano mensal inicial com 12 conteúdos: 3 por semana.
-- Alterna formatos: carrossel, reels, post estático e stories/ideias de stories.
-- Para cada conteúdo, cria objetivo, legenda/roteiro quando fizer sentido, CTA, hashtags e status.
-- Cria também tarefas para imagem, mas não assumes que a imagem foi gerada.
-- Cria critérios de revisão visual quando houver tarefa visual.
-- Quando houver comentários ou mensagens, cria apenas respostas em rascunho.
-- Se faltarem dados importantes, não bloqueies tudo: usa hipóteses provisórias e lista o que precisa ser confirmado.
-- Age de forma autónoma dentro das regras, como uma equipa de social media organizada.
-
-Regras obrigatórias:
-- Nunca publiques conteúdo.
-- Nunca respondas clientes como se a resposta tivesse sido enviada.
-- Respostas a comentários/DMs são sempre rascunhos.
-- Nunca inventes preços.
-- Nunca prometas resultados garantidos.
-- Nunca cries provas sociais falsas.
-- Imagens só podem avançar depois de ideia e legenda aprovadas por humano.
-- Publicação automática fica sempre bloqueada.
-- Mesmo quando uma imagem for considerada boa no futuro, a aprovação final continua humana.
-- Se algo for hipótese, marca como "Hipótese provisória".
-- Se algo estiver confirmado, marca como "Informação confirmada".
-
-Agentes disponíveis nesta chamada:
-${agentList}
-
-Workflow interno obrigatório:
-1. Coordenador interpreta o pedido e define objetivo.
-2. Conteúdo/Calendário cria plano editorial.
-3. Copywriting cria legendas, CTAs, hashtags e roteiros.
-4. Criativo Visual cria tarefas/prompts visuais, apenas como pendente.
-5. Relatórios organiza status, calendário e próximos passos.
-6. Revisão Final verifica riscos: promessas falsas, preços inventados, tom e aprovação humana.
-7. Coordenador devolve tudo consolidado.
-
-Devolve apenas JSON válido, sem markdown, sem comentários e sem texto fora do JSON.
-Usa strings simples. Se uma lista for longa, limita a 5 itens.
-Formato:
-{
-  "coordinatorMessage": "resumo curto do coordenador",
-  "agentsUsed": ["coordinator", "content"],
-  "strategy": {
-    "period": "semana/mês/campanha",
-    "objective": "objetivo principal",
-    "contentMix": ["educativo", "comercial", "autoridade"],
-    "postingRhythm": "ex: 3 posts por semana",
-    "approvalPolicy": "resumo da política de aprovação"
-  },
-  "drafts": [
-    {
-      "title": "título",
-      "format": "Carrossel/Reels/Post estático/Resposta",
-      "category": "Educativo/Comercial/Autoridade/etc",
-      "text": "conteúdo completo em rascunho",
-      "cta": "CTA sugerido",
-      "hashtags": ["#hashtag"],
-      "status": "Em revisão",
-      "visualTask": {
-        "needed": true,
-        "prompt": "prompt visual para imagem futura",
-        "styleNotes": "direção visual profissional",
-        "reviewCriteria": ["critério"]
-      },
-      "assumptions": ["hipótese usada"]
-    }
-  ],
-  "calendar": [
-    {
-      "date": "YYYY-MM-DD",
-      "format": "Carrossel",
-      "category": "Educativo",
-      "title": "tema",
-      "status": "Em revisão"
-    }
-  ],
-  "workflow": [
-    {
-      "agent": "coordinator",
-      "task": "tarefa",
-      "status": "feito/pendente"
-    }
-  ],
-  "approvalQueue": [
-    {
-      "item": "nome do conteúdo",
-      "requiresApprovalFor": ["ideia", "legenda", "imagem", "publicação"],
-      "blockedActions": ["publicar", "responder cliente"]
-    }
-  ],
-  "reportingTasks": ["tarefa de relatório ou métrica para acompanhar"],
-  "needsHumanApproval": ["ponto a validar"],
-  "confirmedInfo": ["informação confirmada usada"],
-  "provisionalAssumptions": ["hipótese provisória"]
-}`;
+  return [...new Set(selected)];
 }
 
 function parseAnthropicText(data) {
@@ -190,26 +62,26 @@ function parseAnthropicText(data) {
 }
 
 function safeJsonParse(text) {
-  const normalized = text
+  const normalized = String(text || "")
     .replace(/```json/gi, "")
     .replace(/```/g, "")
     .replace(/,\s*([}\]])/g, "$1")
     .trim();
+
   try {
     return JSON.parse(normalized);
   } catch {
     const start = normalized.indexOf("{");
     const end = normalized.lastIndexOf("}");
     if (start >= 0 && end > start) {
-      const sliced = normalized.slice(start, end + 1).replace(/,\s*([}\]])/g, "$1");
-      return JSON.parse(sliced);
+      return JSON.parse(normalized.slice(start, end + 1).replace(/,\s*([}\]])/g, "$1"));
     }
     throw new Error("Resposta da IA não veio em JSON válido.");
   }
 }
 
-async function repairJsonWithModel(rawText, model) {
-  const repairResponse = await fetch("https://api.anthropic.com/v1/messages", {
+async function callAnthropic({ model, system, user, maxTokens = 4500, temperature = 0.35 }) {
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -218,44 +90,178 @@ async function repairJsonWithModel(rawText, model) {
     },
     body: JSON.stringify({
       model,
-      max_tokens: 6500,
-      temperature: 0,
-      system:
-        "Converte a entrada em JSON válido. Não acrescentes conteúdo. Não uses markdown. Corrige apenas sintaxe JSON: vírgulas, aspas, arrays e objetos.",
-      messages: [
-        {
-          role: "user",
-          content: rawText,
-        },
-      ],
+      max_tokens: maxTokens,
+      temperature,
+      system,
+      messages: [{ role: "user", content: user }],
     }),
   });
 
-  const data = await repairResponse.json();
-  if (!repairResponse.ok) {
-    throw new Error(data.error?.message || "Erro ao reparar JSON da IA.");
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error?.message || "Erro ao chamar Anthropic.");
   }
+  return parseAnthropicText(data);
+}
 
-  return safeJsonParse(parseAnthropicText(data));
+async function callAnthropicJson(args) {
+  const text = await callAnthropic(args);
+  try {
+    return safeJsonParse(text);
+  } catch {
+    const repaired = await callAnthropic({
+      model: MODEL_CHEAP,
+      maxTokens: args.maxTokens,
+      temperature: 0,
+      system:
+        "Converte a entrada em JSON válido. Não acrescentes conteúdo. Não uses markdown. Corrige apenas sintaxe JSON.",
+      user: text,
+    });
+    return safeJsonParse(repaired);
+  }
+}
+
+function baseRules() {
+  return `Contexto:
+- Empresa: Proxiassistant.
+- Tipo: consultoria local para empresas e empreendedores.
+- Canal principal: Instagram.
+- Tom: profissional, claro e direto.
+
+Regras obrigatórias:
+- Nunca publicar conteúdo.
+- Nunca responder clientes automaticamente.
+- Respostas a comentários/DMs são sempre rascunhos.
+- Nunca inventar preços.
+- Nunca prometer resultados garantidos.
+- Nunca criar provas sociais falsas.
+- Imagens só podem avançar depois de ideia e legenda aprovadas por humano.
+- Publicação automática fica bloqueada.
+- Se algo for hipótese, marcar como "Hipótese provisória".
+- Devolver apenas JSON válido, sem markdown.`;
+}
+
+function coordinatorSystem() {
+  return `${baseRules()}
+
+És o Agente Coordenador. Age como gestor completo de redes sociais.
+Quando o utilizador disser algo amplo como "gere o Instagram", cria um plano profissional sem pedir microinstruções.
+Decide período, objetivo, mix editorial, ritmo, workflow e aprovações.
+
+Formato JSON:
+{
+  "coordinatorMessage": "resumo curto",
+  "strategy": {
+    "period": "semana/mês/campanha",
+    "objective": "objetivo principal",
+    "contentMix": ["educativo", "autoridade", "comercial"],
+    "postingRhythm": "ritmo sugerido",
+    "approvalPolicy": "política de aprovação"
+  },
+  "workflow": [
+    {"agent": "coordinator", "task": "tarefa", "status": "feito/pendente"}
+  ],
+  "confirmedInfo": ["informação confirmada"],
+  "provisionalAssumptions": ["hipótese provisória"],
+  "needsHumanApproval": ["ponto a validar"]
+}`;
+}
+
+function contentSystem() {
+  return `${baseRules()}
+
+És o Agente Conteúdo/Calendário.
+Cria calendário editorial profissional com base no pedido e na estratégia do Coordenador.
+Se for pedido mensal e não houver quantidade, cria 12 conteúdos.
+Se for pedido semanal e não houver quantidade, cria 3 conteúdos.
+Alterna formatos: Carrossel, Reels, Post estático, Story.
+Equilibra educativo, autoridade, relacionamento e comercial.
+
+Formato JSON:
+{
+  "calendar": [
+    {
+      "date": "YYYY-MM-DD ou Semana 1",
+      "format": "Carrossel/Reels/Post estático/Story",
+      "category": "Educativo/Autoridade/Comercial/Relacionamento",
+      "title": "tema",
+      "objective": "objetivo do conteúdo",
+      "status": "Em revisão"
+    }
+  ],
+  "contentNotes": ["nota curta"]
+}`;
+}
+
+function copySystem() {
+  return `${baseRules()}
+
+És o Agente Copywriting e Criativo Visual.
+Recebes um calendário e transformas cada item em rascunho pronto para aprovação.
+Para carrosséis, escreve estrutura por slides.
+Para Reels, escreve roteiro curto.
+Para posts estáticos, escreve legenda.
+Para Stories, escreve sequência simples.
+Inclui CTA, hashtags e tarefa visual para cada conteúdo.
+
+Formato JSON:
+{
+  "drafts": [
+    {
+      "title": "título",
+      "format": "Carrossel/Reels/Post estático/Story/Resposta",
+      "category": "categoria",
+      "text": "conteúdo completo em rascunho",
+      "cta": "CTA sugerido",
+      "hashtags": ["#hashtag"],
+      "status": "Em revisão",
+      "visualTask": {
+        "needed": true,
+        "prompt": "prompt visual futuro",
+        "styleNotes": "direção visual profissional",
+        "reviewCriteria": ["legibilidade", "profissionalismo", "coerência"]
+      },
+      "assumptions": ["hipótese usada"]
+    }
+  ]
+}`;
+}
+
+function reviewSystem() {
+  return `${baseRules()}
+
+És o Agente Revisão Final e Relatórios.
+Revê riscos, aprovações, promessas, preço inventado, tom e organização.
+Não reescrevas tudo. Devolve fila de aprovação, tarefas de relatório e alertas.
+
+Formato JSON:
+{
+  "approvalQueue": [
+    {
+      "item": "nome do conteúdo",
+      "requiresApprovalFor": ["ideia", "legenda", "imagem", "publicação"],
+      "blockedActions": ["publicar", "responder cliente"]
+    }
+  ],
+  "reportingTasks": ["tarefa"],
+  "reviewNotes": ["nota"],
+  "needsHumanApproval": ["ponto a validar"]
+}`;
 }
 
 function buildFallbackFromText(rawText, requestText, selectedAgents, model) {
-  const cleanText = rawText
-    .replace(/```json/gi, "")
-    .replace(/```/g, "")
-    .trim();
+  const cleanText = String(rawText || "").replace(/```json/gi, "").replace(/```/g, "").trim();
 
   return {
     coordinatorMessage:
-      "A IA gerou conteúdo, mas a estrutura técnica veio inválida. Transformei a resposta num rascunho seguro para revisão humana.",
+      "A IA gerou conteúdo, mas houve uma falha técnica na estrutura. Preservei a resposta como rascunho seguro.",
     agentsUsed: selectedAgents,
     strategy: {
       period: "a confirmar",
       objective: requestText,
       contentMix: ["educativo", "autoridade", "comercial"],
       postingRhythm: "a confirmar pela equipa",
-      approvalPolicy:
-        "Ideias, legendas, imagens, respostas e publicação ficam pendentes de aprovação humana.",
+      approvalPolicy: "Tudo fica pendente de aprovação humana.",
     },
     drafts: [
       {
@@ -268,21 +274,15 @@ function buildFallbackFromText(rawText, requestText, selectedAgents, model) {
         status: "Em revisão",
         visualTask: {
           needed: true,
-          prompt: "Criar direção visual apenas depois de aprovação humana da ideia e legenda.",
-          styleNotes: "Visual profissional, limpo, alinhado com consultoria local.",
-          reviewCriteria: ["legibilidade", "profissionalismo", "coerência com a marca"],
+          prompt: "Criar imagem apenas depois de aprovação humana.",
+          styleNotes: "Visual profissional, limpo e alinhado com consultoria local.",
+          reviewCriteria: ["legibilidade", "profissionalismo", "coerência"],
         },
-        assumptions: ["Fallback técnico usado porque a resposta JSON veio inválida."],
+        assumptions: ["Fallback técnico usado."],
       },
     ],
     calendar: [],
-    workflow: [
-      {
-        agent: "coordinator",
-        task: "Converter resposta inválida em rascunho seguro.",
-        status: "feito",
-      },
-    ],
+    workflow: [{ agent: "coordinator", task: "Converter resposta em rascunho seguro.", status: "feito" }],
     approvalQueue: [
       {
         item: "Rascunho gerado pelo Coordenador",
@@ -290,15 +290,77 @@ function buildFallbackFromText(rawText, requestText, selectedAgents, model) {
         blockedActions: ["publicar", "responder cliente"],
       },
     ],
-    reportingTasks: ["Rever o rascunho e pedir nova geração se a estrutura estiver incompleta."],
-    needsHumanApproval: ["Validar conteúdo antes de qualquer uso."],
-    confirmedInfo: ["A Proxiassistant exige aprovação humana antes de publicar."],
-    provisionalAssumptions: ["A resposta foi preservada como rascunho por segurança."],
-    meta: {
-      model,
-      selectedAgents,
-      parserFallback: true,
-    },
+    reportingTasks: ["Rever rascunho e regenerar se necessário."],
+    needsHumanApproval: ["Validar conteúdo antes de uso."],
+    confirmedInfo: ["Aprovação humana é obrigatória."],
+    provisionalAssumptions: ["Resposta preservada em modo fallback."],
+    meta: { model, selectedAgents, parserFallback: true },
+  };
+}
+
+async function runOrchestration({ requestText, objective, selectedAgents, useReview }) {
+  const coordinator = await callAnthropicJson({
+    model: MODEL_NORMAL,
+    maxTokens: 2200,
+    system: coordinatorSystem(),
+    user: `Objetivo selecionado: ${objective}\nPedido do utilizador: ${requestText}`,
+  });
+
+  const content = await callAnthropicJson({
+    model: MODEL_CHEAP,
+    maxTokens: 4200,
+    system: contentSystem(),
+    user: JSON.stringify({ requestText, objective, strategy: coordinator.strategy }),
+  });
+
+  const copy = await callAnthropicJson({
+    model: MODEL_NORMAL,
+    maxTokens: 7500,
+    system: copySystem(),
+    user: JSON.stringify({
+      requestText,
+      objective,
+      strategy: coordinator.strategy,
+      calendar: content.calendar || [],
+    }),
+  });
+
+  const reviewModel = useReview ? MODEL_REVIEW : MODEL_NORMAL;
+  const review = await callAnthropicJson({
+    model: reviewModel,
+    maxTokens: 3000,
+    temperature: 0.2,
+    system: reviewSystem(),
+    user: JSON.stringify({
+      requestText,
+      strategy: coordinator.strategy,
+      calendar: content.calendar || [],
+      drafts: copy.drafts || [],
+    }),
+  });
+
+  return {
+    coordinatorMessage: coordinator.coordinatorMessage,
+    agentsUsed: selectedAgents,
+    strategy: coordinator.strategy,
+    drafts: copy.drafts || [],
+    calendar: (content.calendar || []).map((item) => ({
+      date: item.date || "",
+      format: item.format || "Post",
+      category: item.category || "Conteúdo",
+      title: item.title || "Sem título",
+      status: item.status || "Em revisão",
+    })),
+    workflow: coordinator.workflow || [],
+    approvalQueue: review.approvalQueue || [],
+    reportingTasks: review.reportingTasks || [],
+    needsHumanApproval: [
+      ...(coordinator.needsHumanApproval || []),
+      ...(review.needsHumanApproval || []),
+    ],
+    confirmedInfo: coordinator.confirmedInfo || [],
+    provisionalAssumptions: coordinator.provisionalAssumptions || [],
+    reviewNotes: review.reviewNotes || [],
   };
 }
 
@@ -319,60 +381,24 @@ export default async function handler(req, res) {
     }
 
     const selectedAgents = inferAgents(requestText, objective);
-    const model = useReview || selectedAgents.includes("review") ? MODEL_REVIEW : MODEL_NORMAL;
-
-    const anthropicResponse = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": process.env.ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: 6500,
-        temperature: 0.4,
-        system: systemPrompt(selectedAgents),
-        messages: [
-          {
-            role: "user",
-            content: `Objetivo selecionado: ${objective}\n\nPedido do utilizador:\n${requestText}`,
-          },
-        ],
-      }),
-    });
-
-    const data = await anthropicResponse.json();
-    if (!anthropicResponse.ok) {
-      return res.status(anthropicResponse.status).json({
-        error: data.error?.message || "Erro ao chamar Anthropic.",
-      });
-    }
-
-    const text = parseAnthropicText(data);
-    let parsed;
-    try {
-      parsed = safeJsonParse(text);
-    } catch {
-      try {
-        parsed = await repairJsonWithModel(text, MODEL_CHEAP);
-      } catch {
-        parsed = buildFallbackFromText(text, requestText, selectedAgents, model);
-      }
-    }
+    const result = await runOrchestration({ requestText, objective, selectedAgents, useReview });
 
     return res.status(200).json({
-      ...parsed,
+      ...result,
       meta: {
-        ...(parsed.meta || {}),
-        model,
+        model: MODEL_NORMAL,
         selectedAgents,
         cheapModel: MODEL_CHEAP,
         normalModel: MODEL_NORMAL,
         reviewModel: MODEL_REVIEW,
+        orchestration: "multi-agent-staged",
       },
     });
   } catch (error) {
-    return res.status(500).json({ error: error.message || "Erro inesperado." });
+    const { requestText = "", objective = "conteudo" } = req.body || {};
+    const selectedAgents = inferAgents(requestText, objective);
+    return res.status(200).json(
+      buildFallbackFromText(error.message, requestText, selectedAgents, MODEL_NORMAL),
+    );
   }
 }
