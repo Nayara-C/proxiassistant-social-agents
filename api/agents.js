@@ -295,11 +295,12 @@ Para Stories, escreve sequência simples.
 Inclui CTA, hashtags e tarefa visual para cada conteúdo.
 
 Guia visual obrigatório para visualTask:
-- Portfólio corporate premium para Proxiassistant / Proxi.
+- Portfólio corporate premium para consultoria empresarial.
 - Inspirar-se em padrões de consultoria profissional de alto nível sem copiar Deloitte, PwC, KPMG ou qualquer marca existente.
 - Estilo limpo, editorial, moderno, confiável e sofisticado.
 - Paleta: azul corporativo profundo, branco, cinza claro, azul claro e pequenos detalhes neutros.
 - Misturar fotografia empresarial realista, arquitetura moderna, dados/relatórios, mapas discretos, gráficos subtis e abstrações com linhas finas.
+- Não pedir texto, letras, slogans, logótipos, websites, assinaturas ou palavras na imagem.
 - Evitar aparência genérica de IA, stock artificial, excesso de texto, promessas, preços e logótipos de terceiros.
 - Criar prompts específicos por post, com critérios de revisão úteis.
 
@@ -384,14 +385,14 @@ function defaultVisualTask(item) {
   const title = item?.title || "Conteúdo Proxiassistant";
   return {
     needed: true,
-    prompt: `Criar imagem premium para Instagram sobre "${title}", com estética corporate azul/branco/cinza, consultoria profissional, dados ou ambiente empresarial moderno.`,
+    prompt: `Criar imagem premium para Instagram sobre o conceito "${title}", sem texto e sem logótipo, com estética corporate azul/branco/cinza, consultoria profissional, dados ou ambiente empresarial moderno.`,
     styleNotes:
-      "Visual corporate premium para Proxiassistant/Proxi: azul profundo, branco, cinza claro, fotografia empresarial realista ou abstração elegante, sem copiar marcas existentes.",
+      "Visual corporate premium: azul profundo, branco, cinza claro, fotografia empresarial realista ou abstração elegante, sem texto, sem letras e sem copiar marcas existentes.",
     reviewCriteria: [
       "parece premium e profissional",
       "não parece stock genérico",
       "não inclui preços nem promessas",
-      "mantém coerência com a marca Proxi",
+      "não inclui texto nem logótipo inventado",
     ],
   };
 }

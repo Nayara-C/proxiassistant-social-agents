@@ -17,18 +17,20 @@ function buildImagePrompt({ title, format, category, caption, visualTask }) {
     "Design profissional, claro e sóbrio para consultoria local, inspirado em comunicação empresarial premium.";
 
   const prompt = [
-    "Criar uma imagem quadrada premium para Instagram da marca Proxiassistant / Proxi.",
+    "Criar uma imagem quadrada premium para Instagram de uma consultoria empresarial.",
     "",
     "Direção de marca:",
     "- Consultoria local para empresas e empreendedores.",
     "- Aparência de consultoria profissional premium, ao nível de firmas reconhecidas, sem copiar Deloitte, PwC, KPMG ou qualquer marca existente.",
     "- Sensação: confiança, rigor, clareza, organização, inovação discreta.",
     "- Visual limpo, editorial, sofisticado, corporativo e credível.",
-    "- Usar azul corporativo profundo semelhante ao logótipo Proxi, branco, cinza claro, azul claro e detalhes subtis.",
+    "- Usar azul corporativo profundo, branco, cinza claro, azul claro e detalhes subtis.",
     "- Composição com muito espaço negativo, hierarquia clara e ar premium.",
     "- Fotografia empresarial realista ou abstrato corporativo elegante, conforme o tema.",
     "- Evitar stock genérico exagerado, pessoas com aparência artificial, mãos deformadas, gráficos confusos, excesso de brilhos, 3D infantil ou estilo cartoon.",
-    "- Se houver texto na imagem, usar apenas poucas palavras grandes, limpas e legíveis; preferir áreas sem texto quando houver dúvida.",
+    "- Não escrever a palavra Proxi, Proxiassistant, conta proxi ou qualquer logótipo inventado na imagem.",
+    "- Não criar tipografia, letras, slogans, marcas, websites, assinaturas ou texto pequeno.",
+    "- A imagem deve funcionar como base visual profissional; o texto final será adicionado pela equipa no design.",
     "- Não usar logótipos de terceiros.",
     "- Não incluir preços, promessas de resultados, selos falsos, rankings falsos ou avaliações falsas.",
     "",
@@ -39,7 +41,7 @@ function buildImagePrompt({ title, format, category, caption, visualTask }) {
     "",
     `Formato do conteúdo: ${format || "Post Instagram"}.`,
     `Categoria: ${category || "Conteúdo empresarial"}.`,
-    `Tema: ${title || "Conteúdo Proxiassistant"}.`,
+    `Tema conceptual, apenas para orientar a cena, sem escrever este texto na imagem: ${title || "conteúdo empresarial"}.`,
     "",
     "Direção visual aprovada:",
     visualTask?.prompt || "Imagem editorial empresarial, organizada e com espaço visual para mensagem curta.",
@@ -68,7 +70,12 @@ function reviewVisualRequest({ title, caption, visualTask }) {
     warnings.push("O rascunho não tinha prompt visual detalhado; foi usado um prompt seguro padrão.");
   }
   if (String(visualTask?.prompt || "").length < 80) {
-    warnings.push("O prompt visual era curto; foi enriquecido automaticamente com o guia visual Proxi.");
+    warnings.push("O prompt visual era curto; foi enriquecido automaticamente com o guia visual corporate.");
+  }
+  if (/logo|logotipo|logótipo|texto|tipografia|proxi/i.test(visualTask?.prompt || "")) {
+    warnings.push(
+      "O pedido visual menciona texto/logótipo; a geração foi orientada para não inventar marcas nem letras.",
+    );
   }
 
   return {
@@ -76,8 +83,9 @@ function reviewVisualRequest({ title, caption, visualTask }) {
     warnings,
     criteria: [
       "A imagem deve parecer premium, profissional e adequada a consultoria.",
-      "A imagem deve seguir o universo azul/branco/cinza da Proxi.",
+      "A imagem deve seguir o universo azul/branco/cinza definido para a marca.",
       "A imagem não deve parecer stock genérico nem visual artificial.",
+      "A imagem não deve conter texto, logótipo inventado ou palavras geradas pela IA.",
       "Não deve conter preços, promessas garantidas ou provas sociais falsas.",
       "A imagem final deve ser validada por uma pessoa antes de publicar.",
     ],

@@ -504,9 +504,9 @@ function runCoordinatorLocal(requestText, objective, errorMessage = "", processi
     ],
     visualTask: {
       needed: true,
-      prompt: `Criar imagem profissional para "${idea.title}", com estilo limpo de consultoria empresarial.`,
-      styleNotes: "Visual profissional, claro e alinhado com empresas e empreendedores.",
-      reviewCriteria: ["legibilidade", "profissionalismo", "coerência com a legenda"],
+      prompt: `Criar imagem profissional para o conceito "${idea.title}", sem texto e sem logótipo, com estilo limpo de consultoria empresarial.`,
+      styleNotes: "Visual profissional, claro, azul/branco/cinza, sem letras, sem slogans e sem logótipos inventados.",
+      reviewCriteria: ["sem texto", "sem logótipo inventado", "profissionalismo", "coerência com a legenda"],
     },
     image: null,
     imageStatus: "Não gerada",
@@ -615,6 +615,7 @@ async function generateImageForDraft(id) {
       approval.imageStatus = draft.imageStatus;
     }
   } catch (error) {
+    console.error("Erro detalhado ao gerar imagem:", error);
     draft.imageStatus = `Erro ao gerar imagem: ${error.message}`;
   }
 
