@@ -1,6 +1,7 @@
 const IDEOGRAM_MODEL_ENDPOINT =
   process.env.IDEOGRAM_MODEL_ENDPOINT || "https://api.ideogram.ai/v1/ideogram-v3/generate";
 const IDEOGRAM_RENDERING_SPEED = process.env.IDEOGRAM_RENDERING_SPEED || "TURBO";
+const IDEOGRAM_ASPECT_RATIO = process.env.IDEOGRAM_ASPECT_RATIO || "";
 const MAX_PROMPT_LENGTH = 3600;
 
 function compactText(value, limit = 1400) {
@@ -83,6 +84,25 @@ function reviewVisualRequest({ title, caption, visualTask }) {
   };
 }
 
+function readIdeogramError(data) {
+  if (!data) return "Erro ao gerar imagem.";
+  if (typeof data === "string") return data;
+  if (typeof data.message === "string") return data.message;
+  if (typeof data.detail === "string") return data.detail;
+  if (typeof data.error === "string") return data.error;
+  if (typeof data.error?.message === "string") return data.error.message;
+  if (Array.isArray(data.errors) && data.errors.length) {
+    return data.errors
+      .map((item) => item.message || item.detail || JSON.stringify(item))
+      .join(" ");
+  }
+  try {
+    return JSON.stringify(data);
+  } catch {
+    return "Erro ao gerar imagem.";
+  }
+}
+
 export default async function handler(request, response) {
   if (request.method !== "POST") {
     response.status(405).json({ error: "Método não permitido." });
@@ -101,6 +121,14 @@ export default async function handler(request, response) {
     const payload = request.body || {};
     const review = reviewVisualRequest(payload);
     const prompt = buildImagePrompt(payload);
+    const requestBody = {
+      prompt,
+      rendering_speed: IDEOGRAM_RENDERING_SPEED,
+    };
+
+    if (IDEOGRAM_ASPECT_RATIO) {
+      requestBody.aspect_ratio = IDEOGRAM_ASPECT_RATIO;
+    }
 
     const ideogramResponse = await fetch(IDEOGRAM_MODEL_ENDPOINT, {
       method: "POST",
@@ -108,11 +136,7 @@ export default async function handler(request, response) {
         "content-type": "application/json",
         "Api-Key": process.env.IDEOGRAM_API_KEY,
       },
-      body: JSON.stringify({
-        prompt,
-        rendering_speed: IDEOGRAM_RENDERING_SPEED,
-        aspect_ratio: "ASPECT_1_1",
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     const rawData = await ideogramResponse.text();
@@ -124,7 +148,7 @@ export default async function handler(request, response) {
     }
     if (!ideogramResponse.ok) {
       response.status(ideogramResponse.status).json({
-        error: data.error?.message || data.message || "Erro ao gerar imagem.",
+        error: readIdeogramError(data),
       });
       return;
     }
@@ -147,6 +171,7 @@ export default async function handler(request, response) {
           imagesRequested: 1,
           duplicateRequestsBlockedInApp: true,
           renderingSpeed: IDEOGRAM_RENDERING_SPEED,
+          aspectRatioParameterSent: Boolean(IDEOGRAM_ASPECT_RATIO),
         },
       },
     });
