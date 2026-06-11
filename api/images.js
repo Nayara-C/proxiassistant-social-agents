@@ -149,6 +149,10 @@ export default async function handler(request, response) {
     if (!ideogramResponse.ok) {
       response.status(ideogramResponse.status).json({
         error: readIdeogramError(data),
+        provider: "ideogram",
+        status: ideogramResponse.status,
+        hint:
+          "Confirma se a IDEOGRAM_API_KEY está correta, se há créditos disponíveis e se IDEOGRAM_RENDERING_SPEED está definido como TURBO, DEFAULT ou QUALITY.",
       });
       return;
     }

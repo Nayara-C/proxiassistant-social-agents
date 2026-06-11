@@ -587,9 +587,15 @@ async function generateImageForDraft(id) {
     });
 
     const rawText = await response.text();
-    const data = rawText ? JSON.parse(rawText) : {};
+    let data = {};
+    try {
+      data = rawText ? JSON.parse(rawText) : {};
+    } catch {
+      data = { error: rawText || "Resposta inválida da API de imagem." };
+    }
     if (!response.ok) {
-      throw new Error(readableApiError(data.error || data || "Erro ao gerar imagem."));
+      const hint = data.hint ? ` ${data.hint}` : "";
+      throw new Error(`${readableApiError(data.error || data || "Erro ao gerar imagem.")}${hint}`);
     }
 
     draft.image = {
