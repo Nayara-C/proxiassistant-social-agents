@@ -300,7 +300,9 @@ Guia visual obrigatório para visualTask:
 - Estilo limpo, editorial, moderno, confiável e sofisticado.
 - Paleta: azul corporativo profundo, branco, cinza claro, azul claro e pequenos detalhes neutros.
 - Misturar fotografia empresarial realista, arquitetura moderna, dados/relatórios, mapas discretos, gráficos subtis e abstrações com linhas finas.
-- Não pedir texto, letras, slogans, logótipos, websites, assinaturas ou palavras na imagem.
+- Pedir sempre o design final do post quadrado, não mockup, não telemóvel, não screenshot e não interface de Instagram.
+- Para posts estáticos e capas de carrossel, pedir título principal grande, legível e com forte contraste.
+- Não pedir logótipos, websites, assinaturas, usernames, marcas falsas ou texto pequeno.
 - Evitar aparência genérica de IA, stock artificial, excesso de texto, promessas, preços e logótipos de terceiros.
 - Criar prompts específicos por post, com critérios de revisão úteis.
 
@@ -385,14 +387,17 @@ function defaultVisualTask(item) {
   const title = item?.title || "Conteúdo Proxiassistant";
   return {
     needed: true,
-    prompt: `Criar imagem premium para Instagram sobre o conceito "${title}", sem texto e sem logótipo, com estética corporate azul/branco/cinza, consultoria profissional, dados ou ambiente empresarial moderno.`,
+    prompt: `Criar design final de post quadrado 1:1 para Instagram sobre "${title}", sem telemóvel, sem interface de Instagram e sem mockup. Usar título grande e legível, estética corporate azul/branco/cinza, consultoria profissional, dados ou ambiente empresarial moderno.`,
     styleNotes:
-      "Visual corporate premium: azul profundo, branco, cinza claro, fotografia empresarial realista ou abstração elegante, sem texto, sem letras e sem copiar marcas existentes.",
+      "Visual corporate premium: azul profundo, branco, cinza claro, layout editorial, título grande legível, sem telemóvel, sem screenshot, sem usernames, sem logótipos inventados.",
     reviewCriteria: [
       "parece premium e profissional",
+      "é o post final e não um mockup",
+      "não tem telemóvel nem interface de Instagram",
+      "título está legível",
       "não parece stock genérico",
       "não inclui preços nem promessas",
-      "não inclui texto nem logótipo inventado",
+      "não inclui logótipo inventado nem texto pequeno ilegível",
     ],
   };
 }

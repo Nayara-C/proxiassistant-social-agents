@@ -504,9 +504,9 @@ function runCoordinatorLocal(requestText, objective, errorMessage = "", processi
     ],
     visualTask: {
       needed: true,
-      prompt: `Criar imagem profissional para o conceito "${idea.title}", sem texto e sem logótipo, com estilo limpo de consultoria empresarial.`,
-      styleNotes: "Visual profissional, claro, azul/branco/cinza, sem letras, sem slogans e sem logótipos inventados.",
-      reviewCriteria: ["sem texto", "sem logótipo inventado", "profissionalismo", "coerência com a legenda"],
+      prompt: `Criar design final de post quadrado 1:1 para Instagram sobre "${idea.title}", sem telemóvel, sem mockup e sem interface de Instagram. Título grande, legível e estilo limpo de consultoria empresarial.`,
+      styleNotes: "Visual profissional, claro, azul/branco/cinza, título legível, sem screenshot, sem usernames e sem logótipos inventados.",
+      reviewCriteria: ["post final", "sem telemóvel", "sem interface Instagram", "título legível", "profissionalismo"],
     },
     image: null,
     imageStatus: "Não gerada",

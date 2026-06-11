@@ -4,6 +4,14 @@ const IDEOGRAM_RENDERING_SPEED = process.env.IDEOGRAM_RENDERING_SPEED || "TURBO"
 const IDEOGRAM_ASPECT_RATIO = process.env.IDEOGRAM_ASPECT_RATIO || "";
 const MAX_PROMPT_LENGTH = 3600;
 
+function buildHeadline(title) {
+  return String(title || "Organização empresarial")
+    .replace(/[“”"]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 80);
+}
+
 function compactText(value, limit = 1400) {
   return String(value || "")
     .replace(/\s+/g, " ")
@@ -12,27 +20,37 @@ function compactText(value, limit = 1400) {
 }
 
 function buildImagePrompt({ title, format, category, caption, visualTask }) {
+  const headline = buildHeadline(title);
   const styleNotes =
     visualTask?.styleNotes ||
     "Design profissional, claro e sóbrio para consultoria local, inspirado em comunicação empresarial premium.";
 
   const prompt = [
-    "Criar uma imagem quadrada premium para Instagram de uma consultoria empresarial.",
+    "Criar o DESIGN FINAL de um post quadrado 1:1 para Instagram de uma consultoria empresarial.",
+    "A imagem deve ser o próprio post pronto para publicar, não uma pré-visualização, não um mockup e não uma fotografia de um telemóvel.",
     "",
-    "Direção de marca:",
+    "Proibições obrigatórias:",
+    "- Não criar telemóvel, smartphone, ecrã, app, moldura de Instagram, feed, interface, likes, comentários, barra inferior ou screenshot.",
+    "- Não criar logótipos inventados, websites, usernames, marcas falsas ou nomes de concorrentes.",
+    "- Não escrever texto pequeno, ilegível, distorcido ou em falso português.",
+    "- Não colocar Deloitte, PwC, KPMG ou qualquer marca de terceiros.",
+    "- Não incluir preços, promessas de resultados, selos falsos, rankings falsos ou avaliações falsas.",
+    "",
+    "Texto do post:",
+    `- Usar exatamente este título principal, grande e legível: "${headline}".`,
+    "- Se o título for longo, dividir em 2 ou 3 linhas bem equilibradas.",
+    "- Não adicionar parágrafos pequenos. No máximo, uma linha curta de apoio sem detalhes.",
+    "- O texto deve ocupar área ampla e ter contraste forte.",
+    "",
+    "Direção visual:",
     "- Consultoria local para empresas e empreendedores.",
     "- Aparência de consultoria profissional premium, ao nível de firmas reconhecidas, sem copiar Deloitte, PwC, KPMG ou qualquer marca existente.",
     "- Sensação: confiança, rigor, clareza, organização, inovação discreta.",
-    "- Visual limpo, editorial, sofisticado, corporativo e credível.",
+    "- Layout limpo, editorial, sofisticado, corporativo e credível.",
     "- Usar azul corporativo profundo, branco, cinza claro, azul claro e detalhes subtis.",
     "- Composição com muito espaço negativo, hierarquia clara e ar premium.",
-    "- Fotografia empresarial realista ou abstrato corporativo elegante, conforme o tema.",
+    "- Pode usar fotografia empresarial realista discreta, arquitetura moderna, gráficos subtis ou abstração corporativa elegante.",
     "- Evitar stock genérico exagerado, pessoas com aparência artificial, mãos deformadas, gráficos confusos, excesso de brilhos, 3D infantil ou estilo cartoon.",
-    "- Não escrever a palavra Proxi, Proxiassistant, conta proxi ou qualquer logótipo inventado na imagem.",
-    "- Não criar tipografia, letras, slogans, marcas, websites, assinaturas ou texto pequeno.",
-    "- A imagem deve funcionar como base visual profissional; o texto final será adicionado pela equipa no design.",
-    "- Não usar logótipos de terceiros.",
-    "- Não incluir preços, promessas de resultados, selos falsos, rankings falsos ou avaliações falsas.",
     "",
     "Elementos visuais aceitáveis:",
     "- Escritório moderno com vidro, reuniões profissionais, análise de dados, relatórios financeiros, gráficos subtis, cidade corporativa, arquitetura moderna.",
@@ -41,7 +59,7 @@ function buildImagePrompt({ title, format, category, caption, visualTask }) {
     "",
     `Formato do conteúdo: ${format || "Post Instagram"}.`,
     `Categoria: ${category || "Conteúdo empresarial"}.`,
-    `Tema conceptual, apenas para orientar a cena, sem escrever este texto na imagem: ${title || "conteúdo empresarial"}.`,
+    `Tema do conteúdo: ${title || "conteúdo empresarial"}.`,
     "",
     "Direção visual aprovada:",
     visualTask?.prompt || "Imagem editorial empresarial, organizada e com espaço visual para mensagem curta.",
@@ -72,9 +90,9 @@ function reviewVisualRequest({ title, caption, visualTask }) {
   if (String(visualTask?.prompt || "").length < 80) {
     warnings.push("O prompt visual era curto; foi enriquecido automaticamente com o guia visual corporate.");
   }
-  if (/logo|logotipo|logótipo|texto|tipografia|proxi/i.test(visualTask?.prompt || "")) {
+  if (/logo|logotipo|logótipo|proxi/i.test(visualTask?.prompt || "")) {
     warnings.push(
-      "O pedido visual menciona texto/logótipo; a geração foi orientada para não inventar marcas nem letras.",
+      "O pedido visual menciona logótipo/marca; a geração foi orientada para não inventar marcas.",
     );
   }
 
@@ -85,7 +103,9 @@ function reviewVisualRequest({ title, caption, visualTask }) {
       "A imagem deve parecer premium, profissional e adequada a consultoria.",
       "A imagem deve seguir o universo azul/branco/cinza definido para a marca.",
       "A imagem não deve parecer stock genérico nem visual artificial.",
-      "A imagem não deve conter texto, logótipo inventado ou palavras geradas pela IA.",
+      "A imagem deve ser o post final, sem telemóvel, app, feed ou screenshot.",
+      "O título principal deve estar grande e legível.",
+      "A imagem não deve conter logótipo inventado, usernames, interface social ou texto pequeno ilegível.",
       "Não deve conter preços, promessas garantidas ou provas sociais falsas.",
       "A imagem final deve ser validada por uma pessoa antes de publicar.",
     ],
